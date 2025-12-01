@@ -423,6 +423,29 @@ impl KaranaUI {
                  (id, 50)
              };
              format!("Bug Reported! Proposal ID: {}. Potential Bounty: {} KARA. DAO is voting...", prop_id, bounty)
+        } else if input.starts_with("vote") {
+            // vote <id> <yes/no>
+            let parts: Vec<&str> = input.split_whitespace().collect();
+            if parts.len() < 3 {
+                return Ok("Usage: vote <proposal_id> <yes/no>".to_string());
+            }
+            let prop_id = parts[1].parse::<u32>().unwrap_or(0);
+            let decision = parts[2].to_lowercase() == "yes";
+            
+            let mut dao = self.dao.lock().unwrap();
+            match dao.vote("user", prop_id, decision) {
+                Ok(passed) => {
+                    if passed {
+                         dao.execute_if_passed(prop_id, &mut |id| {
+                            log::info!("Executed: Prop {} passed!", id);
+                        });
+                        format!("Voted on Prop {}. Result: PASSED & EXECUTED.", prop_id)
+                    } else {
+                        format!("Voted on Prop {}. Result: Pending/Failed.", prop_id)
+                    }
+                },
+                Err(e) => format!("Vote Failed: {}", e),
+            }
         } else if input.starts_with("haptic") || input.starts_with("hud") || input.starts_with("power") || input.starts_with("gaze") {
              // Delegate to Hardware Atom
              match self.hardware.execute_intent(&input) {
@@ -602,8 +625,8 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 .constraints(
                     [
                         Constraint::Length(3),      // Header
-                        Constraint::Percentage(40), // User Output
-                        Constraint::Percentage(40), // Chain Logs
+                        Constraint::Percentage(60), // Main Workspace (Dashboard/App)
+                        Constraint::Percentage(20), // Logs
                         Constraint::Length(3),      // Input
                     ]
                     .as_ref(),
@@ -631,11 +654,11 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 .block(Block::default().borders(Borders::ALL));
             f.render_widget(header, chunks[0]);
 
-            // 2. User Output / Dashboard / AR HUD
+            // 2. Main Workspace (Dashboard or App)
             let title = if let Some(app) = active_app.clone() {
                 format!(" Running: {} (Type 'close' to exit) ", app)
             } else {
-                " Symbiotic Interface ".to_string()
+                " Kāraṇa Dashboard ".to_string()
             };
 
             let content = if active_app.is_some() {
@@ -649,17 +672,26 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 hud.push_str("\n(Type suggestion to execute)");
                 hud
             } else {
-                // Use Compositor to render the view if it's not a raw string
-                if view.starts_with("AI Generated") {
-                    // Add widget to compositor for visualization
-                    compositor.add_widget("ai_view", &view, 0.1, 0.3);
-                    // Render frame
-                    let width = chunks[1].width as usize;
-                    let height = chunks[1].height as usize;
-                    compositor.render(width, height).unwrap_or(view)
-                } else {
-                    view
-                }
+                // Dashboard View
+                let mut dashboard = String::new();
+                dashboard.push_str("Welcome to Kāraṇa OS. The Sovereign AI-Native OS.\n\n");
+                dashboard.push_str("[ System Status ]\n");
+                dashboard.push_str(&format!("- Network: Connected (Swarm Active)\n"));
+                dashboard.push_str(&format!("- Consensus: Proof-of-Storage (Height #{})\n", height));
+                dashboard.push_str(&format!("- Identity: {} (Verified)\n\n", did));
+                
+                dashboard.push_str("[ App Launcher ]\n");
+                dashboard.push_str("1. Terminal (run terminal)\n");
+                dashboard.push_str("2. File Manager (run files)\n");
+                dashboard.push_str("3. Bazaar (search app <query>)\n");
+                dashboard.push_str("4. AI Assistant (analyze <image> / transcribe <audio>)\n");
+                dashboard.push_str("5. Governance (vote <id>)\n\n");
+                
+                dashboard.push_str("[ Recent Activity ]\n");
+                dashboard.push_str(&format!("- Last Intent: {}\n", intent));
+                dashboard.push_str(&format!("- View Context: {}\n", view));
+                
+                dashboard
             };
 
             let output = Paragraph::new(content)
