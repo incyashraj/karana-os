@@ -45,6 +45,8 @@ pub struct UiState {
     pub cwd: String,
     pub power_status: String,
     pub gaze_status: String,
+    pub ar_context: Option<String>,
+    pub ar_suggestions: Vec<String>,
 }
 
 pub struct KaranaUI {
@@ -79,6 +81,8 @@ impl KaranaUI {
             cwd: std::env::current_dir().unwrap_or_default().to_string_lossy().to_string(),
             power_status: "Init...".to_string(),
             gaze_status: "Gaze: --".to_string(),
+            ar_context: None,
+            ar_suggestions: vec![],
         }));
 
         let (tx, rx) = mpsc::channel();
@@ -224,14 +228,28 @@ impl KaranaUI {
         } else if input.starts_with("analyze") {
             let path_str = input.replace("analyze", "").trim().to_string();
             let ai = self.ai_render.clone();
+            let state_clone = self.state.clone();
             
-            // Spawn blocking task for Vision
+            // Spawn blocking task for Vision + Context Logic
             let res = tokio::task::spawn_blocking(move || -> anyhow::Result<String> {
                 let mut ai_locked = ai.lock().unwrap();
+                
+                // 1. Vision (BLIP)
                 let caption = ai_locked.describe_image(&path_str)
                     .map_err(|e| anyhow::anyhow!("Vision Error: {}", e))?;
+                
+                // 2. Context Logic (TinyLlama)
+                // "Real Functionality": We ask the LLM what to do with this visual info.
+                let suggestions = ai_locked.suggest_ar_actions(&caption)
+                    .unwrap_or_else(|e| vec![format!("Error generating suggestions: {}", e)]);
+                
+                // 3. Update State
+                if let Ok(mut s) = state_clone.lock() {
+                    s.ar_context = Some(caption.clone());
+                    s.ar_suggestions = suggestions.clone();
+                }
                     
-                Ok(format!("AR Context [{}]:\n\"{}\"", path_str, caption))
+                Ok(format!("AR Context [{}]:\n\"{}\"\n\nSuggestions:\n{:?}", path_str, caption, suggestions))
             }).await??;
             
             res
@@ -527,9 +545,9 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 )
                 .split(f.area());
 
-            let (balance, height, view, intent, active_app, app_output, power, gaze) = {
+            let (balance, height, view, intent, active_app, app_output, power, gaze, ar_ctx, ar_sug) = {
                 let s = state.lock().unwrap();
-                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone())
+                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone(), s.ar_context.clone(), s.ar_suggestions.clone())
             };
 
             // 1. Header
@@ -541,7 +559,7 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 .block(Block::default().borders(Borders::ALL));
             f.render_widget(header, chunks[0]);
 
-            // 2. User Output / Dashboard
+            // 2. User Output / Dashboard / AR HUD
             let title = if let Some(app) = active_app.clone() {
                 format!(" Running: {} (Type 'close' to exit) ", app)
             } else {
@@ -550,6 +568,14 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
 
             let content = if active_app.is_some() {
                 app_output
+            } else if let Some(ctx) = ar_ctx {
+                // AR HUD Mode
+                let mut hud = format!("--- AR VISUAL CONTEXT ---\nDetected: {}\n\n[AI SUGGESTIONS]\n", ctx);
+                for (i, sug) in ar_sug.iter().enumerate() {
+                    hud.push_str(&format!("{}. {}\n", i+1, sug));
+                }
+                hud.push_str("\n(Type suggestion to execute)");
+                hud
             } else {
                 view
             };

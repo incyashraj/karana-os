@@ -359,6 +359,13 @@ impl KaranaAI {
     }
 
     pub fn predict(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
+        // Lazy load check
+        if self.gen_model.is_none() {
+             let (m, t) = Self::load_gen_model().unwrap_or((None, None));
+             self.gen_model = m;
+             self.gen_tokenizer = t;
+        }
+
         if let (Some(model), Some(tokenizer)) = (&mut self.gen_model, &self.gen_tokenizer) {
             // Real Inference
             log::info!("Atom 3: Running Real Inference on TinyLlama...");
@@ -376,11 +383,7 @@ impl KaranaAI {
             
             for _ in 0..max_tokens {
                 let input = Tensor::new(all_tokens.as_slice(), &self.device)?.unsqueeze(0)?;
-                let logits = model.forward(&input, 0)?; // 0 = pos? No, quantized forward might differ.
-                // Actually QLlama forward takes (x, pos). We need to handle position.
-                // Simplified: Just pass full sequence each time (slow) or implement KV cache.
-                // For prototype, full sequence is "okay" for short responses.
-                
+                let logits = model.forward(&input, 0)?; 
                 let logits = logits.squeeze(0)?;
                 let next_token_logits = logits.get(logits.dim(0)? - 1)?;
                 let next_token = logits_processor.sample(&next_token_logits)?;
@@ -398,9 +401,37 @@ impl KaranaAI {
             Ok(output_text.replace("</s>", "").trim().to_string())
 
         } else {
-            // Simulation Fallback
+            // Simulation Fallback - Only if model is truly missing
+            // We prefer to fail for specific tasks, but for general chat we keep this for now
+            // to allow the OS to boot without 2GB downloads.
             self.predict_simulated(prompt)
         }
+    }
+
+    /// Generates actionable AR commands based on context.
+    /// STRICTLY requires Real AI (TinyLlama). No simulation.
+    pub fn suggest_ar_actions(&mut self, context: &str) -> Result<Vec<String>> {
+        if self.gen_model.is_none() {
+             // Try load one last time
+             let (m, t) = Self::load_gen_model().unwrap_or((None, None));
+             self.gen_model = m;
+             self.gen_tokenizer = t;
+        }
+
+        if self.gen_model.is_none() {
+            return Err(anyhow!("AI Core not installed. Cannot generate AR suggestions. Run 'install ai-core'."));
+        }
+
+        let prompt = format!("Context: {}. Suggest 3 short, actionable AR commands for smart glasses. Format: - Command", context);
+        // We use the existing predict function which now uses the real model if present
+        let response = self.predict(&prompt, 60)?;
+        
+        let actions: Vec<String> = response.lines()
+            .filter(|l| l.trim().starts_with("-") || l.trim().starts_with("*"))
+            .map(|l| l.trim().trim_start_matches(|c| c == '-' || c == '*' || c == ' ').to_string())
+            .collect();
+            
+        Ok(actions)
     }
 
     fn predict_simulated(&self, prompt: &str) -> Result<String> {
