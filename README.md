@@ -20,8 +20,6 @@ It is designed specifically for **Smart Glasses and IoT devices**, providing a "
 
 Kāraṇa OS is a **First Principles Rethink** of the operating system. It rejects the legacy metaphors of the 1970s (files, folders, permissions, applications) and replaces them with a sovereign, symbiotic architecture built for the age of AI and Zero-Knowledge Cryptography.
 
-## 📜 The Philosophy: Questioning Everything
-
 We started with a blank slate and a dangerous question: **"If we built an OS today, knowing what we know about AI, ZK-Proofs, and Decentralization, what would it look like?"**
 
 ### The Rejections
