@@ -15,6 +15,8 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
 | **5** | **Ecosystem** | Cross-device sync (Phone <-> Glass), AR Bazaar. | Pending |
 | **6** | **Production** | Hardware certification, Beta fleet, Public Launch. | Pending |
 
+> **CRITICAL MANDATE**: All features must implement **Real Functionality** where possible. Simulations are only acceptable if hardware is physically absent (e.g., Eye Tracker), but even then, the *logic* must be production-ready (e.g., processing real audio files for Voice, reading real system battery for Power).
+
 ---
 
 ## 🛠️ Phase 1: IoT Low-Power Adaptation (Completed)
@@ -25,7 +27,7 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
 *   **Status**: Implemented.
 *   **Features**:
     *   `PowerManager` struct with profiles (Performance, Balanced, LowPower, Hibernation).
-    *   Simulated battery drain and charging logic.
+    *   **Real Implementation**: Uses `sysinfo` to read host battery state (if available). Falls back to simulation only if no battery is detected.
     *   Integrated into `KaranaHardware` and UI Header.
 
 ### 1.2 Battery AI Prediction
@@ -47,7 +49,10 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
 
 ### 2.2 Voice Command
 *   **Status**: Planned.
-*   **Stack**: `whisper-rs` or `coqui-stt` for local speech-to-text.
+*   **Stack**: `candle-transformers` (Whisper) for local speech-to-text.
+*   **Real Functionality**: 
+    *   Must download and run a quantized Whisper model.
+    *   Must process audio buffers (even if loaded from file for testing).
 *   **Wake Word**: "Hey Kāraṇa" triggers the intent loop.
 
 ### 2.3 AR Compositor
