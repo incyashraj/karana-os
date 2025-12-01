@@ -329,6 +329,12 @@ impl KaranaUI {
                  (id, 50)
              };
              format!("Bug Reported! Proposal ID: {}. Potential Bounty: {} KARA. DAO is voting...", prop_id, bounty)
+        } else if input.starts_with("haptic") || input.starts_with("hud") || input.starts_with("power") || input.starts_with("gaze") {
+             // Delegate to Hardware Atom
+             match self.hardware.execute_intent(&input) {
+                 Ok(msg) => msg,
+                 Err(e) => format!("Hardware Error: {}", e),
+             }
         } else {
             // Step 2: AI Parse & Render (Symbiotic Canvas)
             let prompt = format!("Describe a UI view for this user intent: '{}'. Keep it short.", input);
@@ -483,9 +489,9 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
 
         // Update Input Status every 100ms
         if last_input_update.elapsed() >= std::time::Duration::from_millis(100) {
-             let mut input = hardware.input.lock().unwrap();
-             input.simulate_random_gaze();
-             let g_status = format!("Gaze: ({:.1}, {:.1})", input.last_gaze.0, input.last_gaze.1);
+             let input = hardware.input.lock().unwrap();
+             // Real Gaze is now updated via Mouse Events (see below)
+             let g_status = format!("Gaze: ({:.2}, {:.2})", input.last_gaze.0, input.last_gaze.1);
              if let Ok(mut s) = state.lock() {
                  s.gaze_status = g_status;
              }
@@ -560,30 +566,42 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
 
         // Event Handling
         if crossterm::event::poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => {
-                        let _ = intent_tx.send("quit".to_string());
-                        break;
-                    }
-                    KeyCode::Char(c) => {
-                        input_buffer.push(c);
-                    }
-                    KeyCode::Backspace => {
-                        input_buffer.pop();
-                    }
-                    KeyCode::Enter => {
-                        if !input_buffer.is_empty() {
-                            if let Ok(mut s) = state.lock() {
-                                s.current_view = format!("Processing intent: '{}'...", input_buffer);
-                                s.last_intent = input_buffer.clone();
-                            }
-                            let _ = intent_tx.send(input_buffer.clone());
-                            input_buffer.clear();
+            match event::read()? {
+                Event::Key(key) => {
+                    match key.code {
+                        KeyCode::Char('q') => {
+                            let _ = intent_tx.send("quit".to_string());
+                            break;
                         }
+                        KeyCode::Char(c) => {
+                            input_buffer.push(c);
+                        }
+                        KeyCode::Backspace => {
+                            input_buffer.pop();
+                        }
+                        KeyCode::Enter => {
+                            if !input_buffer.is_empty() {
+                                if let Ok(mut s) = state.lock() {
+                                    s.current_view = format!("Processing intent: '{}'...", input_buffer);
+                                    s.last_intent = input_buffer.clone();
+                                }
+                                let _ = intent_tx.send(input_buffer.clone());
+                                input_buffer.clear();
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
-                }
+                },
+                Event::Mouse(mouse) => {
+                    // Real Gaze Tracking (Mouse Proxy)
+                    if let Ok(size) = terminal.size() {
+                        let x = mouse.column as f32 / size.width as f32;
+                        let y = mouse.row as f32 / size.height as f32;
+                        let mut input = hardware.input.lock().unwrap();
+                        input.update_gaze(x, y);
+                    }
+                },
+                _ => {}
             }
         }
     }

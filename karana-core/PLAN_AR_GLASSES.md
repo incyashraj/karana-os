@@ -9,7 +9,7 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
 | Phase | Focus | Key Deliverables | Status |
 |-------|-------|------------------|--------|
 | **1** | **IoT & Power** | Power Management Atom, Battery AI, Mesh Networking Prep. | **COMPLETED** |
-| **2** | **Multimodal I/O** | Eye-tracking (sim), Voice Command (STT), Haptic Feedback. | **IN PROGRESS** |
+| **2** | **Multimodal I/O** | Eye-tracking (sim), Voice Command (STT), Haptic Feedback. | **COMPLETED** |
 | **3** | **AI Co-Pilot** | Context-aware AR overlays, ZK-Health monitoring. | Pending |
 | **4** | **Privacy & Identity** | DID (Decentralized ID), ZK-Signatures for glances. | Pending |
 | **5** | **Ecosystem** | Cross-device sync (Phone <-> Glass), AR Bazaar. | Pending |
@@ -36,27 +36,35 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
 
 ---
 
-## 👁️ Phase 2: Multimodal Core (In Progress)
+## 👁️ Phase 2: Multimodal Core (Completed)
 
 **Objective**: Replace keyboard/mouse with Gaze, Voice, and Gesture.
 
-### 2.1 Gaze Tracking (Simulated)
-*   **Status**: Implemented (`src/hardware/input.rs`).
+### 2.1 Gaze Tracking (Real Mouse Proxy)
+*   **Status**: Implemented (`src/hardware/input.rs`, `src/ui.rs`).
 *   **Logic**: 
-    *   `MultimodalInput` struct tracks `Gaze(x, y)` and `Voice` commands.
-    *   Simulated random gaze movement for dev testing.
+    *   `MultimodalInput` struct tracks `Gaze(x, y)`.
+    *   **Real Implementation**: Captures `Event::Mouse` from the terminal to update gaze coordinates in real-time.
     *   UI Header displays real-time Gaze coordinates.
 
 ### 2.2 Voice Command
-*   **Status**: Planned.
-*   **Stack**: `candle-transformers` (Whisper) for local speech-to-text.
+*   **Status**: Implemented (`src/ai/mod.rs`).
+*   **Stack**: `candle-transformers` (Whisper) + `symphonia`.
 *   **Real Functionality**: 
-    *   Must download and run a quantized Whisper model.
-    *   Must process audio buffers (even if loaded from file for testing).
-*   **Wake Word**: "Hey Kāraṇa" triggers the intent loop.
+    *   `transcribe <file>` command reads real audio files.
+    *   Runs Whisper Tiny.en inference on CPU.
+    *   Auto-downloads model on first use.
 
-### 2.3 AR Compositor
-*   **Status**: Planned.
+### 2.3 Haptic Feedback
+*   **Status**: Implemented (`src/hardware/haptic.rs`).
+*   **Stack**: `evdev` crate (Linux Input Subsystem).
+*   **Real Functionality**:
+    *   Scans `/dev/input/event*` for devices with `FORCEFEEDBACK` capability.
+    *   Sends real Rumble effects if hardware is present.
+    *   Gracefully degrades to logging if no haptic device is found.
+
+### 2.4 AR Compositor
+*   **Status**: Planned (Phase 3).
 *   **UI**: Migrate TUI concepts to a graphical overlay (using `wgpu` or `druid`).
 *   **HUD**: Heads-Up Display for vital stats (Time, Battery, Next Meeting).
 

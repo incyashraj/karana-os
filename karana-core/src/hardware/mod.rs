@@ -1,11 +1,13 @@
 pub mod power;
 pub mod input;
+pub mod haptic;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
 use self::power::{PowerManager, PowerProfile};
 use self::input::MultimodalInput;
+use self::haptic::HapticEngine;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DeviceType {
@@ -30,6 +32,7 @@ pub struct KaranaHardware {
     pub caps: HardwareCapabilities,
     pub power: Arc<Mutex<PowerManager>>,
     pub input: Arc<Mutex<MultimodalInput>>,
+    pub haptic: Arc<Mutex<HapticEngine>>,
 }
 
 impl KaranaHardware {
@@ -64,8 +67,9 @@ impl KaranaHardware {
 
         let power = Arc::new(Mutex::new(PowerManager::new()));
         let input = Arc::new(Mutex::new(MultimodalInput::new()));
+        let haptic = Arc::new(Mutex::new(HapticEngine::new()));
 
-        Self { caps, power, input }
+        Self { caps, power, input, haptic }
     }
 
     pub fn execute_intent(&self, intent: &str) -> Result<String> {
@@ -103,8 +107,13 @@ impl KaranaHardware {
             },
             "gaze status" => {
                 let mut input = self.input.lock().unwrap();
-                input.simulate_random_gaze(); // Sim update
+                // input.simulate_random_gaze(); // Removed simulation here, UI loop handles it or real mouse
                 Ok(format!("Gaze: ({:.2}, {:.2})", input.last_gaze.0, input.last_gaze.1))
+            },
+            "haptic test" => {
+                let mut h = self.haptic.lock().unwrap();
+                h.vibrate(500, 30000)?; // 500ms, ~50% strength
+                Ok(format!("Haptic Pulse Sent. Engine: {}", h.status()))
             },
             _ => Ok(format!("Hardware: Intent '{}' acknowledged but no driver map found.", intent)),
         }
