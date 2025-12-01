@@ -6,14 +6,54 @@
 
 This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) into v2.0 (AR-Native Firmware).
 
-| Phase | Focus | Key Deliverables |
-|-------|-------|------------------|
-| **1** | **IoT & Power** | Power Management Atom, Battery AI, Mesh Networking Prep. |
-| **2** | **Multimodal I/O** | Eye-tracking (sim), Voice Command (STT), Haptic Feedback. |
-| **3** | **AI Co-Pilot** | Context-aware AR overlays, ZK-Health monitoring. |
-| **4** | **Privacy & Identity** | DID (Decentralized ID), ZK-Signatures for glances. |
-| **5** | **Ecosystem** | Cross-device sync (Phone <-> Glass), AR Bazaar. |
-| **6** | **Production** | Hardware certification, Beta fleet, Public Launch.
+| Phase | Focus | Key Deliverables | Status |
+|-------|-------|------------------|--------|
+| **1** | **IoT & Power** | Power Management Atom, Battery AI, Mesh Networking Prep. | **COMPLETED** |
+| **2** | **Multimodal I/O** | Eye-tracking (sim), Voice Command (STT), Haptic Feedback. | **IN PROGRESS** |
+| **3** | **AI Co-Pilot** | Context-aware AR overlays, ZK-Health monitoring. | Pending |
+| **4** | **Privacy & Identity** | DID (Decentralized ID), ZK-Signatures for glances. | Pending |
+| **5** | **Ecosystem** | Cross-device sync (Phone <-> Glass), AR Bazaar. | Pending |
+| **6** | **Production** | Hardware certification, Beta fleet, Public Launch. | Pending |
+
+---
+
+## 🛠️ Phase 1: IoT Low-Power Adaptation (Completed)
+
+**Objective**: Transform the "Desktop Monad" into an efficient "Eternal Node" suitable for battery-powered devices.
+
+### 1.1 Power Management Atom (`src/hardware/power.rs`)
+*   **Status**: Implemented.
+*   **Features**:
+    *   `PowerManager` struct with profiles (Performance, Balanced, LowPower, Hibernation).
+    *   Simulated battery drain and charging logic.
+    *   Integrated into `KaranaHardware` and UI Header.
+
+### 1.2 Battery AI Prediction
+*   **Status**: Partially Implemented (via Power Profiles).
+*   **Logic**: System now exposes power state to the AI context.
+
+---
+
+## 👁️ Phase 2: Multimodal Core (In Progress)
+
+**Objective**: Replace keyboard/mouse with Gaze, Voice, and Gesture.
+
+### 2.1 Gaze Tracking (Simulated)
+*   **Status**: Implemented (`src/hardware/input.rs`).
+*   **Logic**: 
+    *   `MultimodalInput` struct tracks `Gaze(x, y)` and `Voice` commands.
+    *   Simulated random gaze movement for dev testing.
+    *   UI Header displays real-time Gaze coordinates.
+
+### 2.2 Voice Command
+*   **Status**: Planned.
+*   **Stack**: `whisper-rs` or `coqui-stt` for local speech-to-text.
+*   **Wake Word**: "Hey Kāraṇa" triggers the intent loop.
+
+### 2.3 AR Compositor
+*   **Status**: Planned.
+*   **UI**: Migrate TUI concepts to a graphical overlay (using `wgpu` or `druid`).
+*   **HUD**: Heads-Up Display for vital stats (Time, Battery, Next Meeting).
 
 ---
 

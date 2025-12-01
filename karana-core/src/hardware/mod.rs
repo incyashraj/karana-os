@@ -1,9 +1,11 @@
 pub mod power;
+pub mod input;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
 use self::power::{PowerManager, PowerProfile};
+use self::input::MultimodalInput;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DeviceType {
@@ -27,6 +29,7 @@ pub struct HardwareCapabilities {
 pub struct KaranaHardware {
     pub caps: HardwareCapabilities,
     pub power: Arc<Mutex<PowerManager>>,
+    pub input: Arc<Mutex<MultimodalInput>>,
 }
 
 impl KaranaHardware {
@@ -60,8 +63,9 @@ impl KaranaHardware {
         }
 
         let power = Arc::new(Mutex::new(PowerManager::new()));
+        let input = Arc::new(Mutex::new(MultimodalInput::new()));
 
-        Self { caps, power }
+        Self { caps, power, input }
     }
 
     pub fn execute_intent(&self, intent: &str) -> Result<String> {
@@ -96,6 +100,11 @@ impl KaranaHardware {
                 let mut pm = self.power.lock().unwrap();
                 pm.toggle_charging_sim();
                 Ok(format!("Charging Sim: {}", pm.battery.is_charging))
+            },
+            "gaze status" => {
+                let mut input = self.input.lock().unwrap();
+                input.simulate_random_gaze(); // Sim update
+                Ok(format!("Gaze: ({:.2}, {:.2})", input.last_gaze.0, input.last_gaze.1))
             },
             _ => Ok(format!("Hardware: Intent '{}' acknowledged but no driver map found.", intent)),
         }

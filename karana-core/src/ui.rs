@@ -44,6 +44,7 @@ pub struct UiState {
     pub app_output: String,
     pub cwd: String,
     pub power_status: String,
+    pub gaze_status: String,
 }
 
 pub struct KaranaUI {
@@ -77,6 +78,7 @@ impl KaranaUI {
             app_output: String::new(),
             cwd: std::env::current_dir().unwrap_or_default().to_string_lossy().to_string(),
             power_status: "Init...".to_string(),
+            gaze_status: "Gaze: --".to_string(),
         }));
 
         let (tx, rx) = mpsc::channel();
@@ -211,6 +213,14 @@ impl KaranaUI {
                 result_view.push_str("No apps found matching your intent.");
             }
             result_view
+        } else if input.starts_with("install ai-core") {
+            let ai = self.ai_render.clone();
+            // Spawn blocking task to download model
+            let res = tokio::task::spawn_blocking(move || {
+                let mut ai_locked = ai.lock().unwrap();
+                ai_locked.download_model()
+            }).await??;
+            res
         } else if input.starts_with("install") || input.starts_with("download") || input.starts_with("get") {
             let app_id = input.replace("install", "")
                               .replace("download", "")
@@ -438,6 +448,7 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
 
     let mut input_buffer = String::new();
     let mut last_power_update = std::time::Instant::now();
+    let mut last_input_update = std::time::Instant::now();
 
     // TUI Loop
     loop {
@@ -449,6 +460,17 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 s.power_status = status;
             }
             last_power_update = std::time::Instant::now();
+        }
+
+        // Update Input Status every 100ms
+        if last_input_update.elapsed() >= std::time::Duration::from_millis(100) {
+             let mut input = hardware.input.lock().unwrap();
+             input.simulate_random_gaze();
+             let g_status = format!("Gaze: ({:.1}, {:.1})", input.last_gaze.0, input.last_gaze.1);
+             if let Ok(mut s) = state.lock() {
+                 s.gaze_status = g_status;
+             }
+             last_input_update = std::time::Instant::now();
         }
 
         terminal.draw(|f| {
@@ -466,15 +488,15 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 )
                 .split(f.area());
 
-            let (balance, height, view, intent, active_app, app_output, power) = {
+            let (balance, height, view, intent, active_app, app_output, power, gaze) = {
                 let s = state.lock().unwrap();
-                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone())
+                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone())
             };
 
             // 1. Header
             let header_text = format!(
-                "Kāraṇa OS v0.2 (Glass) | Balance: {} KARA | Height: #{} | {}",
-                balance, height, power
+                "Kāraṇa OS v0.2 (Glass) | Balance: {} KARA | Height: #{} | {} | {}",
+                balance, height, power, gaze
             );
             let header = Paragraph::new(header_text)
                 .block(Block::default().borders(Borders::ALL));
