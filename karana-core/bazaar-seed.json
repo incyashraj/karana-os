@@ -1,0 +1,35 @@
+[
+  {
+    "id": "rust-native-ide",
+    "name": "Rust Native IDE",
+    "description": "Lightweight, sovereign Rust development environment. WASM-sandboxed.",
+    "version": "1.0.0",
+    "author": "SovereignDevs",
+    "cid": "QmHashRustIDE",
+    "proof_hash": "0xabc123...",
+    "stake": 500,
+    "rating": 4.8
+  },
+  {
+    "id": "vscode-dapp",
+    "name": "VS Code dApp",
+    "description": "Web3-enabled VS Code port. Verifiable extensions.",
+    "version": "1.89.0",
+    "author": "OpenSourceCollective",
+    "cid": "QmHashVSCode",
+    "proof_hash": "0xdef456...",
+    "stake": 1200,
+    "rating": 4.5
+  },
+  {
+    "id": "ml-toolkit",
+    "name": "Phi-3 Local Toolkit",
+    "description": "Local inference engine for Phi-3 models. Privacy-first.",
+    "version": "0.2.1",
+    "author": "AI-DAO",
+    "cid": "QmHashMLTool",
+    "proof_hash": "0xghi789...",
+    "stake": 800,
+    "rating": 4.9
+  }
+]

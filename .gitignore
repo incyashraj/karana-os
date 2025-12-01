@@ -1,0 +1,14 @@
+target/
+**/*.rs.bk
+**/*.log
+karana-cache/
+karana-ledger/
+karana-governance/
+zk_keys_storage.bin
+.DS_Store
+karana-core/karana-root/
+karana-core/iso/
+iso/
+*.iso
+karana-core/models/*.safetensors
+karana-core/models/*.gguf
