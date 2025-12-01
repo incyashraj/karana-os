@@ -47,15 +47,19 @@ Kāraṇa is not a kernel in the traditional sense. It is a **Userspace Monad** 
 *   `build-essential` (for compiling dependencies)
 
 ### Installation
+We provide a bundled installer script to set up the environment, build the core, and initialize the runtime directories.
+
 ```bash
-git clone https://github.com/your-username/karana-os.git
-cd karana-os/karana-core
-cargo build --release
+git clone https://github.com/incyashraj/karana-os.git
+cd karana-os
+chmod +x install.sh
+./install.sh
 ```
 
 ### Running the OS
+After installation, use the launcher script:
 ```bash
-cargo run
+./start_karana.sh
 ```
 
 ### The Symbiotic Interface
