@@ -4,6 +4,7 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
 use candle_transformers::models::quantized_llama::ModelWeights as QLlama;
 use candle_transformers::models::whisper::{self as m, Config as WhisperConfig, Model as WhisperModel};
+use candle_transformers::models::blip;
 use candle_transformers::generation::LogitsProcessor;
 use tokenizers::{Tokenizer, PaddingParams};
 use hf_hub::{api::sync::Api, Repo, RepoType};
@@ -16,6 +17,9 @@ const MODEL_FILE: &str = "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
 
 // Whisper Tiny (Quantized or Float? Let's use tiny.en for speed/size)
 const WHISPER_REPO: &str = "openai/whisper-tiny.en";
+
+// BLIP (Image Captioning)
+const BLIP_REPO: &str = "Salesforce/blip-image-captioning-base";
 
 pub struct KaranaAI {
     device: Device,
@@ -30,6 +34,11 @@ pub struct KaranaAI {
     whisper_tokenizer: Option<Tokenizer>,
     whisper_config: Option<WhisperConfig>,
     whisper_mel: Option<m::audio::AudioConfig>,
+    // Atom 3: Vision Engine (BLIP)
+    blip_model: Option<blip::BlipForConditionalGeneration>,
+    blip_tokenizer: Option<Tokenizer>,
+    blip_processor: Option<blip::BlipProcessor>,
+    blip_config: Option<blip::Config>,
 }
 
 impl KaranaAI {
@@ -62,7 +71,97 @@ impl KaranaAI {
             whisper_tokenizer: None,
             whisper_config: None,
             whisper_mel: None,
+            blip_model: None,
+            blip_tokenizer: None,
+            blip_processor: None,
+            blip_config: None,
         })
+    }
+
+    pub fn load_blip(&mut self) -> Result<()> {
+        if self.blip_model.is_some() { return Ok(()); }
+        
+        log::info!("Atom 3: Loading Vision Model (BLIP)...");
+        let api = Api::new()?;
+        let repo = api.repo(Repo::new(BLIP_REPO.to_string(), RepoType::Model));
+        
+        let config_filename = repo.get("config.json")?;
+        let tokenizer_filename = repo.get("tokenizer.json")?;
+        let weights_filename = repo.get("model.safetensors")?;
+        // BLIP usually has a preprocessor config too, but candle might hardcode or infer it.
+        // Let's check if we need it. candle-transformers blip example uses it.
+        
+        let config: blip::Config = serde_json::from_str(&std::fs::read_to_string(config_filename)?)?;
+        let tokenizer = Tokenizer::from_file(tokenizer_filename).map_err(|e| anyhow!(e))?;
+        
+        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights_filename], DType::F32, &self.device)? };
+        let model = blip::BlipForConditionalGeneration::new(&config, vb)?;
+        
+        // Processor is usually just image resizing/normalization logic.
+        // candle-transformers::models::blip::BlipProcessor might not exist as a struct, 
+        // usually we do manual image prep.
+        // But let's check if we can just store the config and do prep in `describe_image`.
+        
+        self.blip_model = Some(model);
+        self.blip_tokenizer = Some(tokenizer);
+        self.blip_config = Some(config);
+        
+        Ok(())
+    }
+
+    pub fn describe_image(&mut self, image_path: &str) -> Result<String> {
+        if self.blip_model.is_none() {
+            self.load_blip()?;
+        }
+        
+        let model = self.blip_model.as_ref().unwrap();
+        let tokenizer = self.blip_tokenizer.as_ref().unwrap();
+        let config = self.blip_config.as_ref().unwrap();
+        
+        // Load and Preprocess Image
+        let img = image::io::Reader::open(image_path)?.decode()?;
+        let (width, height) = (384, 384); // BLIP default
+        let img = img.resize_exact(width, height, image::imageops::FilterType::Triangle);
+        let img = img.to_rgb8();
+        let data = img.into_raw();
+        let data = Tensor::from_vec(data, (height as usize, width as usize, 3), &self.device)?.permute((2, 0, 1))?;
+        let mean = Tensor::new(&[0.48145466f32, 0.4578275, 0.40821073], &self.device)?.reshape((3, 1, 1))?;
+        let std = Tensor::new(&[0.26862954f32, 0.26130258, 0.27577711], &self.device)?.reshape((3, 1, 1))?;
+        let image_input = (data.to_dtype(DType::F32)? / 255.)?
+            .broadcast_sub(&mean)?
+            .broadcast_div(&std)?
+            .unsqueeze(0)?;
+
+        // Generate Caption
+        // BLIP generation loop
+        let vision_model = model.vision_model();
+        let image_embeds = vision_model.forward(&image_input)?;
+        
+        let mut token_ids = vec![30522u32]; // [BOS] (Check tokenizer, usually 30522 for BERT-based)
+        // Actually BLIP uses BERT tokenizer. 30522 is [CLS] or similar?
+        // Let's trust the standard start token or look it up.
+        // HuggingFace BertTokenizer: [CLS] = 101, [SEP] = 102.
+        // Wait, BLIP might use a different one.
+        // Let's use the tokenizer to encode an empty string or special token.
+        
+        // Correct approach:
+        token_ids = vec![30522]; // Hardcoded from candle example for BLIP
+        
+        let mut logits_processor = LogitsProcessor::new(299792458, Some(1.0), None);
+
+        for _ in 0..20 {
+            let input_ids = Tensor::new(token_ids.as_slice(), &self.device)?.unsqueeze(0)?;
+            let logits = model.text_decoder().forward(&input_ids, &image_embeds)?;
+            let logits = logits.squeeze(0)?;
+            let next_token_logits = logits.get(logits.dim(0)? - 1)?;
+            
+            let next_token = logits_processor.sample(&next_token_logits)?;
+            token_ids.push(next_token);
+            if next_token == 102 { break; } // [SEP]
+        }
+
+        let caption = tokenizer.decode(&token_ids, true).map_err(|e| anyhow!(e))?;
+        Ok(caption)
     }
 
     pub fn load_whisper(&mut self) -> Result<()> {

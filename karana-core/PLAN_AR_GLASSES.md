@@ -10,7 +10,7 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
 |-------|-------|------------------|--------|
 | **1** | **IoT & Power** | Power Management Atom, Battery AI, Mesh Networking Prep. | **COMPLETED** |
 | **2** | **Multimodal I/O** | Eye-tracking (sim), Voice Command (STT), Haptic Feedback. | **COMPLETED** |
-| **3** | **AI Co-Pilot** | Context-aware AR overlays, ZK-Health monitoring. | Pending |
+| **3** | **AI Co-Pilot** | Context-aware AR overlays, Vision (Image Captioning). | **IN PROGRESS** |
 | **4** | **Privacy & Identity** | DID (Decentralized ID), ZK-Signatures for glances. | Pending |
 | **5** | **Ecosystem** | Cross-device sync (Phone <-> Glass), AR Bazaar. | Pending |
 | **6** | **Production** | Hardware certification, Beta fleet, Public Launch. | Pending |
@@ -63,8 +63,23 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
     *   Sends real Rumble effects if hardware is present.
     *   Gracefully degrades to logging if no haptic device is found.
 
-### 2.4 AR Compositor
-*   **Status**: Planned (Phase 3).
+---
+
+## 🧠 Phase 3: AI Co-Pilot (In Progress)
+
+**Objective**: The OS thinks *before* you act.
+
+### 3.1 Vision / Context Awareness
+*   **Status**: In Progress.
+*   **Stack**: `candle-transformers` (BLIP - Bootstrapping Language-Image Pre-training).
+*   **Real Functionality**:
+    *   `analyze <image_path>` command.
+    *   Loads real image files.
+    *   Generates a caption describing the scene (e.g., "a person holding a coffee cup").
+    *   This serves as the "Context" for the AR Overlay.
+
+### 3.2 AR Compositor
+*   **Status**: Planned.
 *   **UI**: Migrate TUI concepts to a graphical overlay (using `wgpu` or `druid`).
 *   **HUD**: Heads-Up Display for vital stats (Time, Battery, Next Meeting).
 

@@ -221,6 +221,20 @@ impl KaranaUI {
                 ai_locked.download_model()
             }).await??;
             res
+        } else if input.starts_with("analyze") {
+            let path_str = input.replace("analyze", "").trim().to_string();
+            let ai = self.ai_render.clone();
+            
+            // Spawn blocking task for Vision
+            let res = tokio::task::spawn_blocking(move || -> anyhow::Result<String> {
+                let mut ai_locked = ai.lock().unwrap();
+                let caption = ai_locked.describe_image(&path_str)
+                    .map_err(|e| anyhow::anyhow!("Vision Error: {}", e))?;
+                    
+                Ok(format!("AR Context [{}]:\n\"{}\"", path_str, caption))
+            }).await??;
+            
+            res
         } else if input.starts_with("transcribe") {
             let path_str = input.replace("transcribe", "").trim().to_string();
             let ai = self.ai_render.clone();
