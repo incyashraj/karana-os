@@ -1,6 +1,22 @@
 # Kāraṇa OS (Kāraṇa-Core)
 
+```text
+  _  __   _   ___   _   _  _   _   
+ | |/ /  /_\ | _ \ /_\ | \| | /_\  
+ | ' <  / _ \|   // _ \| .` |/ _ \ 
+ |_|\_\/_/ \_\_|_/_/ \_\_|\_/_/ \_\
+                                   
+      The Sovereign AI-Native OS
+```
+
 > **"The Operating System is not a tool. It is a partner."**
+
+## 🌟 What is Kāraṇa?
+**Kāraṇa OS** is an experimental operating system designed for the post-app era. Unlike traditional systems (Windows, Linux, macOS) that force you to manage files and open applications, Kāraṇa is built around **Intents** and **Context**.
+
+It is designed specifically for **Smart Glasses and IoT devices**, providing a "Symbiotic Interface" where the OS uses AI to understand your goals and Zero-Knowledge Proofs to secure your data. It doesn't just run programs; it thinks with you.
+
+## 📜 The Philosophy: Questioning Everything
 
 Kāraṇa OS is a **First Principles Rethink** of the operating system. It rejects the legacy metaphors of the 1970s (files, folders, permissions, applications) and replaces them with a sovereign, symbiotic architecture built for the age of AI and Zero-Knowledge Cryptography.
 
