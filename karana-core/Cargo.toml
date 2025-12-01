@@ -41,6 +41,7 @@ crossterm = "0.29.0"
 tui-logger = "0.17.4"
 log = "0.4.28"
 clap = { version = "4.5.53", features = ["derive"] }
+sysinfo = "0.37.2"
 
 [profile.dev.package."*"]
 opt-level = 3

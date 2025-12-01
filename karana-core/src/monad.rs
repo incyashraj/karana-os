@@ -65,7 +65,11 @@ impl KaranaMonad {
         let storage_path = format!("{}/karana-cache", base_path);
         let storage = Arc::new(KaranaStorage::new(&storage_path, "http://localhost:26657", ai.clone())?);
         let runtime = Arc::new(RuntimeActor::new(&swarm)?);
-        let ui = Arc::new(KaranaUI::new(&runtime, &swarm, ai.clone())?);
+        
+        // Phase v1.0: Hardware Abstraction (IoT/Glass)
+        let hardware = Arc::new(KaranaHardware::probe());
+        
+        let ui = Arc::new(KaranaUI::new(&runtime, &swarm, ai.clone(), hardware.clone())?);
         
         // Atom 4: Economy (Persistent Ledger)
         let ledger_path = format!("{}/karana-ledger", base_path);
@@ -87,9 +91,6 @@ impl KaranaMonad {
 
         // Phase v1.0: Persistent State
         let persist = Arc::new(KaranaPersist::new("/dev/sda1")); // Stub root dev
-
-        // Phase v1.0: Hardware Abstraction (IoT/Glass)
-        let hardware = Arc::new(KaranaHardware::probe());
 
         Ok(Self {
             boot,

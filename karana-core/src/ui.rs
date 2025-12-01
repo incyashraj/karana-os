@@ -43,6 +43,7 @@ pub struct UiState {
     pub active_app: Option<String>,
     pub app_output: String,
     pub cwd: String,
+    pub power_status: String,
 }
 
 pub struct KaranaUI {
@@ -55,10 +56,11 @@ pub struct KaranaUI {
     bundle: AppBundle,
     state: Arc<Mutex<UiState>>,
     intent_rx: Mutex<mpsc::Receiver<String>>,
+    hardware: Arc<crate::hardware::KaranaHardware>,
 }
 
 impl KaranaUI {
-    pub fn new(runtime: &Arc<KaranaActor>, swarm: &KaranaSwarm, ai: Arc<Mutex<KaranaAI>>) -> anyhow::Result<Self> {
+    pub fn new(runtime: &Arc<KaranaActor>, swarm: &KaranaSwarm, ai: Arc<Mutex<KaranaAI>>, hardware: Arc<crate::hardware::KaranaHardware>) -> anyhow::Result<Self> {
         let mut dao = KaranaDAO::default();
         // Test mint for user
         dao.token.mint("user", U256::from(200u64));
@@ -74,14 +76,16 @@ impl KaranaUI {
             active_app: None,
             app_output: String::new(),
             cwd: std::env::current_dir().unwrap_or_default().to_string_lossy().to_string(),
+            power_status: "Init...".to_string(),
         }));
 
         let (tx, rx) = mpsc::channel();
 
         // Spawn TUI thread
         let state_clone = state.clone();
+        let hw_clone = hardware.clone();
         std::thread::spawn(move || {
-            if let Err(e) = run_tui(state_clone, tx) {
+            if let Err(e) = run_tui(state_clone, tx, hw_clone) {
                 log::error!("TUI Error: {}", e);
             }
         });
@@ -95,6 +99,7 @@ impl KaranaUI {
             bundle,
             state,
             intent_rx: Mutex::new(rx),
+            hardware,
         })
     }
 
@@ -354,7 +359,7 @@ fn verify_zk_proof(_proof: &[u8], _data: &[u8]) -> bool {
     true
 }
 
-fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>) -> Result<(), io::Error> {
+fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware: Arc<crate::hardware::KaranaHardware>) -> Result<(), io::Error> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -364,12 +369,12 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>) -> Resul
 
     // Boot Animation
     let logo = vec![
-        "  _  __   _   ___   _   _  _   _   ",
-        " | |/ /  /_\ | _ \ /_\ | \| | /_\  ",
-        " | ' <  / _ \|   // _ \| .` |/ _ \ ",
-        " |_|\_\/_/ \_\_|_/_/ \_\_|\_/_/ \_\",
-        "                                   ",
-        "      The Sovereign AI-Native OS   "
+        r"  _  __   _   ___   _   _  _   _   ",
+        r" | |/ /  /_\ | _ \ /_\ | \| | /_\  ",
+        r" | ' <  / _ \|   // _ \| .` |/ _ \ ",
+        r" |_|\_\/_/ \_\_|_/_/ \_\_|\_/_/ \_\",
+        r"                                   ",
+        r"      The Sovereign AI-Native OS   "
     ];
 
     let start = std::time::Instant::now();
@@ -432,9 +437,20 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>) -> Resul
     }
 
     let mut input_buffer = String::new();
+    let mut last_power_update = std::time::Instant::now();
 
     // TUI Loop
     loop {
+        // Update Power Status every 2s
+        if last_power_update.elapsed() >= std::time::Duration::from_secs(2) {
+            let mut pm = hardware.power.lock().unwrap();
+            let status = pm.update();
+            if let Ok(mut s) = state.lock() {
+                s.power_status = status;
+            }
+            last_power_update = std::time::Instant::now();
+        }
+
         terminal.draw(|f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -450,15 +466,15 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>) -> Resul
                 )
                 .split(f.area());
 
-            let (balance, height, view, intent, active_app, app_output) = {
+            let (balance, height, view, intent, active_app, app_output, power) = {
                 let s = state.lock().unwrap();
-                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone())
+                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone())
             };
 
             // 1. Header
             let header_text = format!(
-                "Kāraṇa OS v0.1 (Sovereign) | Balance: {} KARA | Height: #{}",
-                balance, height
+                "Kāraṇa OS v0.2 (Glass) | Balance: {} KARA | Height: #{} | {}",
+                balance, height, power
             );
             let header = Paragraph::new(header_text)
                 .block(Block::default().borders(Borders::ALL));

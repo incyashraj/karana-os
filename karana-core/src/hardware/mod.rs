@@ -1,5 +1,9 @@
+pub mod power;
+
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
+use std::sync::{Arc, Mutex};
+use self::power::{PowerManager, PowerProfile};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DeviceType {
@@ -17,12 +21,12 @@ pub struct HardwareCapabilities {
     pub has_npu: bool, // Neural Processing Unit
     pub has_hud: bool, // Head-Up Display
     pub has_camera: bool,
-    pub battery_level: u8,
     pub sensors: Vec<String>, // IMU, GPS, Lidar
 }
 
 pub struct KaranaHardware {
     pub caps: HardwareCapabilities,
+    pub power: Arc<Mutex<PowerManager>>,
 }
 
 impl KaranaHardware {
@@ -47,7 +51,6 @@ impl KaranaHardware {
             has_npu,
             has_hud,
             has_camera,
-            battery_level: 85, // Simulated
             sensors: vec!["IMU_6AXIS".to_string(), "MIC_ARRAY".to_string()],
         };
 
@@ -56,7 +59,9 @@ impl KaranaHardware {
             log::info!("Atom 3 (Hardware): HUD Display Driver ... OK");
         }
 
-        Self { caps }
+        let power = Arc::new(Mutex::new(PowerManager::new()));
+
+        Self { caps, power }
     }
 
     pub fn execute_intent(&self, intent: &str) -> Result<String> {
@@ -73,11 +78,31 @@ impl KaranaHardware {
             "scan environment" => {
                 Ok("Lidar/Camera: Scanning... Objects detected: [User, Laptop, Coffee Cup]".to_string())
             },
+            "power status" => {
+                let mut pm = self.power.lock().unwrap();
+                Ok(pm.update())
+            },
+            "power save" => {
+                let mut pm = self.power.lock().unwrap();
+                pm.set_profile(PowerProfile::LowPower);
+                Ok("Switched to LowPower Profile".to_string())
+            },
+            "power perf" => {
+                let mut pm = self.power.lock().unwrap();
+                pm.set_profile(PowerProfile::Performance);
+                Ok("Switched to Performance Profile".to_string())
+            },
+            "toggle charge" => {
+                let mut pm = self.power.lock().unwrap();
+                pm.toggle_charging_sim();
+                Ok(format!("Charging Sim: {}", pm.battery.is_charging))
+            },
             _ => Ok(format!("Hardware: Intent '{}' acknowledged but no driver map found.", intent)),
         }
     }
     
     pub fn get_telemetry(&self) -> String {
-        format!("Battery: {}% | Sensors: {:?}", self.caps.battery_level, self.caps.sensors)
+        let mut pm = self.power.lock().unwrap();
+        format!("{} | Sensors: {:?}", pm.update(), self.caps.sensors)
     }
 }
