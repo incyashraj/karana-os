@@ -290,8 +290,23 @@ impl KaranaUI {
             res
         } else if input.starts_with("offload") {
             let prompt = input.replace("offload", "").trim().to_string();
-            let req_id = self.swarm.send_ai_request(prompt.clone()).await?;
-            format!("Offloaded AI Task '{}' to Swarm. Request ID: {}", prompt, req_id)
+            
+            // Authenticate (Simulated Biometrics)
+            let bio_sample = vec![1, 2, 3, 4, 5]; 
+            let (did, proof) = {
+                let id_lock = self.identity.lock().unwrap();
+                if let Some(did_str) = id_lock.get_active_did() {
+                    match id_lock.authenticate(&bio_sample) {
+                        Ok(p) => (did_str, p),
+                        Err(e) => return Ok(format!("Auth Failed: {}", e)),
+                    }
+                } else {
+                    return Ok("Error: No Active DID. Run 'create did <key>' first.".to_string());
+                }
+            };
+
+            let req_id = self.swarm.send_ai_request(prompt.clone(), did.clone(), proof).await?;
+            format!("Offloaded AI Task '{}' to Swarm. Request ID: {}\nAuthenticated as: {}", prompt, req_id, did)
         } else if input.starts_with("create did") {
             // create did <pubkey>
             let parts: Vec<&str> = input.split_whitespace().collect();

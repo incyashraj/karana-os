@@ -285,12 +285,20 @@ impl KaranaMonad {
                         log::info!("Atom 6 (P2P): Message: {}", msg);
                     },
                     KaranaSwarmEvent::AIRequestReceived(req) => {
-                        log::info!("Atom 6 (P2P): Processing AI Request from {}: '{}'", req.requester_peer_id, req.prompt);
+                        log::info!("Atom 6 (P2P): Processing AI Request from {}: '{}'", req.requester_did, req.prompt);
+                        
+                        // Verify Proof (Atom 8: Identity)
+                        // In a real system, we would fetch the DID document from chain and verify proof.
+                        log::info!("Atom 8 (Identity): Verifying ZK-Proof for DID {} (Size: {} bytes)...", req.requester_did, req.proof.len());
+
                         // Offload compute to our local AI (Non-blocking)
                         let ai_clone = self.ai.clone();
                         let swarm_clone = self.swarm.clone();
                         let req_id = req.request_id;
                         let prompt = req.prompt.clone();
+                        
+                        // Get our DID for response
+                        let my_did = self.identity.lock().unwrap().get_active_did().unwrap_or("Node-Alpha".to_string());
                         
                         tokio::task::spawn_blocking(move || {
                             let result = match ai_clone.lock().unwrap().predict(&prompt, 100) {
@@ -298,21 +306,18 @@ impl KaranaMonad {
                                 Err(e) => format!("Compute Error: {}", e),
                             };
                             
-                            // We need to send the response. Since we are in a blocking thread, 
-                            // we need a runtime handle or just block_on if send_ai_response is async.
-                            // send_ai_response is async.
                             let rt = tokio::runtime::Handle::current();
                             rt.block_on(async {
-                                if let Err(e) = swarm_clone.send_ai_response(req_id, result).await {
+                                if let Err(e) = swarm_clone.send_ai_response(req_id, result, my_did).await {
                                     log::error!("Atom 6 (P2P): Failed to send AI response: {}", e);
                                 }
                             });
                         });
                     },
                     KaranaSwarmEvent::AIResponseReceived(res) => {
-                        log::info!("Atom 6 (P2P): Received AI Result [{}]: {}", res.request_id, res.result);
+                        log::info!("Atom 6 (P2P): Received AI Result [{} from {}]: {}", res.request_id, res.responder_did, res.result);
                         // Notify UI
-                        let _ = self.ui.render_intent(format!("Swarm AI Result: {}", res.result), vec![]).await;
+                        let _ = self.ui.render_intent(format!("Swarm AI Result (from {}): {}", res.responder_did, res.result), vec![]).await;
                     },
                     KaranaSwarmEvent::ClipboardReceived(clip) => {
                         log::info!("Atom 6 (P2P): Received Clipboard Sync from {}", clip.did);

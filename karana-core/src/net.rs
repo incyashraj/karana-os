@@ -20,13 +20,15 @@ use serde::{Serialize, Deserialize};
 pub struct AIComputeRequest {
     pub request_id: String,
     pub prompt: String,
-    pub requester_peer_id: String,
+    pub requester_did: String,
+    pub proof: Vec<u8>, // ZK-Proof of Identity
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AIComputeResponse {
     pub request_id: String,
     pub result: String,
+    pub responder_did: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -285,21 +287,23 @@ impl KaranaSwarm {
         Ok(())
     }
 
-    pub async fn send_ai_request(&self, prompt: String) -> Result<String> {
+    pub async fn send_ai_request(&self, prompt: String, did: String, proof: Vec<u8>) -> Result<String> {
         let req_id = uuid::Uuid::new_v4().to_string();
         let req = AIComputeRequest {
             request_id: req_id.clone(),
             prompt,
-            requester_peer_id: "self".to_string(), // In real P2P, use actual PeerId
+            requester_did: did,
+            proof,
         };
         self.cmd_tx.send(SwarmCmd::SendAIRequest(req)).await?;
         Ok(req_id)
     }
 
-    pub async fn send_ai_response(&self, request_id: String, result: String) -> Result<()> {
+    pub async fn send_ai_response(&self, request_id: String, result: String, responder_did: String) -> Result<()> {
         let res = AIComputeResponse {
             request_id,
             result,
+            responder_did,
         };
         self.cmd_tx.send(SwarmCmd::SendAIResponse(res)).await?;
         Ok(())
