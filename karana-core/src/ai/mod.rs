@@ -1,15 +1,14 @@
 use anyhow::{Context, Result, anyhow};
-use candle_core::{Device, Tensor, DType};
+use candle_core::{Device, Tensor, DType, Module};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
 use candle_transformers::models::quantized_llama::ModelWeights as QLlama;
-use candle_transformers::models::whisper::{self as m, Config as WhisperConfig, Model as WhisperModel};
+use candle_transformers::models::whisper::{Config as WhisperConfig, model::Whisper as WhisperModel, audio};
 use candle_transformers::models::blip;
 use candle_transformers::generation::LogitsProcessor;
 use tokenizers::{Tokenizer, PaddingParams};
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use std::path::PathBuf;
-use std::io::Write;
 
 // TinyLlama 1.1B Chat (Quantized) - ~670MB
 const MODEL_REPO: &str = "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
@@ -33,12 +32,11 @@ pub struct KaranaAI {
     whisper_model: Option<WhisperModel>,
     whisper_tokenizer: Option<Tokenizer>,
     whisper_config: Option<WhisperConfig>,
-    whisper_mel: Option<m::audio::AudioConfig>,
     // Atom 3: Vision Engine (BLIP)
     blip_model: Option<blip::BlipForConditionalGeneration>,
     blip_tokenizer: Option<Tokenizer>,
-    blip_processor: Option<blip::BlipProcessor>,
     blip_config: Option<blip::Config>,
+    mel_filters: Vec<f32>,
 }
 
 impl KaranaAI {
@@ -52,7 +50,7 @@ impl KaranaAI {
         });
 
         // Atom 3: Try Initialize Generative Model (Lazy)
-        let (gen_model, gen_tokenizer) = Self::load_gen_model().unwrap_or_else(|e| {
+        let (gen_model, gen_tokenizer) = Self::load_gen_model(&device).unwrap_or_else(|e| {
             log::info!("Atom 3: Generative AI not loaded (Running in Simulation Mode). Reason: {}", e);
             (None, None)
         });
@@ -70,12 +68,30 @@ impl KaranaAI {
             whisper_model: None,
             whisper_tokenizer: None,
             whisper_config: None,
-            whisper_mel: None,
             blip_model: None,
             blip_tokenizer: None,
-            blip_processor: None,
             blip_config: None,
+            mel_filters: Vec::new(),
         })
+    }
+
+    fn load_mel_filters(&mut self) -> Result<()> {
+        if !self.mel_filters.is_empty() { return Ok(()); }
+        
+        log::info!("Atom 3: Loading Mel Filters...");
+        let api = Api::new()?;
+        let repo = api.repo(Repo::new("lmz/candle-whisper".to_string(), RepoType::Space));
+        let mel_filters_path = repo.get("melfilters.bytes")?;
+        
+        let mut file = std::fs::File::open(mel_filters_path)?;
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut file, &mut bytes)?;
+        
+        self.mel_filters = bytes.chunks_exact(4)
+            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+            .collect();
+            
+        Ok(())
     }
 
     pub fn load_blip(&mut self) -> Result<()> {
@@ -114,12 +130,12 @@ impl KaranaAI {
             self.load_blip()?;
         }
         
-        let model = self.blip_model.as_ref().unwrap();
+        let model = self.blip_model.as_mut().unwrap();
         let tokenizer = self.blip_tokenizer.as_ref().unwrap();
-        let config = self.blip_config.as_ref().unwrap();
+        let _config = self.blip_config.as_ref().unwrap();
         
         // Load and Preprocess Image
-        let img = image::io::Reader::open(image_path)?.decode()?;
+        let img = image::ImageReader::open(image_path)?.decode()?;
         let (width, height) = (384, 384); // BLIP default
         let img = img.resize_exact(width, height, image::imageops::FilterType::Triangle);
         let img = img.to_rgb8();
@@ -137,15 +153,8 @@ impl KaranaAI {
         let vision_model = model.vision_model();
         let image_embeds = vision_model.forward(&image_input)?;
         
-        let mut token_ids = vec![30522u32]; // [BOS] (Check tokenizer, usually 30522 for BERT-based)
-        // Actually BLIP uses BERT tokenizer. 30522 is [CLS] or similar?
-        // Let's trust the standard start token or look it up.
-        // HuggingFace BertTokenizer: [CLS] = 101, [SEP] = 102.
-        // Wait, BLIP might use a different one.
-        // Let's use the tokenizer to encode an empty string or special token.
-        
         // Correct approach:
-        token_ids = vec![30522]; // Hardcoded from candle example for BLIP
+        let mut token_ids = vec![30522]; // Hardcoded from candle example for BLIP
         
         let mut logits_processor = LogitsProcessor::new(299792458, Some(1.0), None);
 
@@ -179,12 +188,11 @@ impl KaranaAI {
         let tokenizer = Tokenizer::from_file(tokenizer_filename).map_err(|e| anyhow!(e))?;
         
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights_filename], DType::F32, &self.device)? };
-        let model = WhisperModel::new(&config, vb)?;
+        let model = WhisperModel::load(&vb, config.clone())?;
         
         self.whisper_model = Some(model);
         self.whisper_tokenizer = Some(tokenizer);
         self.whisper_config = Some(config);
-        self.whisper_mel = Some(m::audio::AudioConfig::hparams_tiny()); // tiny.en uses tiny hparams
         
         Ok(())
     }
@@ -193,71 +201,35 @@ impl KaranaAI {
         if self.whisper_model.is_none() {
             self.load_whisper()?;
         }
+        self.load_mel_filters()?;
         
-        let model = self.whisper_model.as_ref().unwrap();
-        let tokenizer = self.whisper_tokenizer.as_ref().unwrap();
         let config = self.whisper_config.as_ref().unwrap();
-        // let mel_config = self.whisper_mel.as_ref().unwrap(); // Not used directly in model.forward? 
-        // Actually we need to compute Mel Spectrogram.
-        
-        // Note: candle-transformers 0.9.1 whisper example uses a helper for mel.
-        // We need to implement or use `candle_transformers::models::whisper::audio::pcm_to_mel`
-        // But that might not be public. Let's check if we can use the model directly.
-        // The `Model` expects a Tensor of mel spectrograms.
-        
-        // For this prototype, implementing full Mel extraction is complex.
-        // However, `candle-transformers` usually exposes `pcm_to_mel`.
-        // If not, we might need to rely on a simulation for the *transcription* part if the audio processing is too heavy to implement in one go.
-        // BUT the user said "Real Functionality".
-        // So I must try to use `pcm_to_mel`.
-        
-        // Let's assume `m::audio::pcm_to_mel` exists and works.
-        // If it fails to compile, I will fix it.
-        
-        let mel = m::audio::pcm_to_mel(&config, &audio_data, &m::audio::AudioConfig::hparams_tiny())?;
+        let mel = audio::pcm_to_mel(config, &audio_data, &self.mel_filters);
         let mel_len = mel.len();
-        let mel_tensor = Tensor::from_vec(mel, (1, 80, mel_len / 80), &self.device)?;
+        let mel = Tensor::from_vec(mel, (1, 80, mel_len / 80), &self.device)?;
         
-        // Generate tokens
-        // Simple greedy decoding
-        let mut tokens = vec![50258u32, 50259, 50359]; // <|startoftranscript|>, <|en|>, <|transcribe|> (check tokenizer for exact IDs)
-        // Actually, let's use the tokenizer to find start tokens if possible, or hardcode for tiny.en
-        // tiny.en: 50257=<|endoftext|>, 50258=<|startoftranscript|>, 50259=<|en|>, 50359=<|transcribe|>, 50363=<|notimestamps|>
+        let model = self.whisper_model.as_mut().unwrap();
+        let audio_features = model.encoder.forward(&mel, true)?;
         
+        // Start tokens: [SOT], [EN], [TRANSCRIBE]
+        // SOT = 50258
+        let mut tokens = vec![50258u32, 50259, 50359]; 
         let mut logits_processor = LogitsProcessor::new(299792458, Some(0.0), None); // Greedy
-        
+
         for _ in 0..100 {
             let input = Tensor::new(tokens.as_slice(), &self.device)?.unsqueeze(0)?;
-            let logits = model.decoder().forward(&input, &model.encoder().forward(&mel_tensor, true)?)?; 
-            // Wait, encoder forward is expensive, should be done once.
-            // model.encoder().forward(&mel_tensor, true)? -> audio_features
-            
-            // Correct loop:
-            // 1. Encode audio
-            // 2. Loop decode
-            break; // Placeholder to avoid infinite loop in this thought block
-        }
-        
-        // Re-implementing full Whisper decode loop is verbose.
-        // Let's use a simplified version or just return a "Real Transcription" stub if the loop is too big.
-        // NO, "Real Functionality".
-        
-        // Okay, let's do the proper loop.
-        let audio_features = model.encoder().forward(&mel_tensor, true)?;
-        
-        for _ in 0..100 {
-            let input = Tensor::new(tokens.as_slice(), &self.device)?.unsqueeze(0)?;
-            let logits = model.decoder().forward(&input, &audio_features)?;
+            let logits = model.decoder.forward(&input, &audio_features, true)?;
             let logits = logits.squeeze(0)?;
             let next_token_logits = logits.get(logits.dim(0)? - 1)?;
             let next_token = logits_processor.sample(&next_token_logits)?;
             
             tokens.push(next_token);
-            if next_token == 50257 { break; } // <|endoftext|>
+            if next_token == 50257 { break; } // [EOT]
         }
         
-        let decoded = tokenizer.decode(&tokens, true).map_err(|e| anyhow!(e))?;
-        Ok(decoded)
+        let tokenizer = self.whisper_tokenizer.as_ref().unwrap();
+        let text = tokenizer.decode(&tokens, true).map_err(|e| anyhow!(e))?;
+        Ok(text)
     }
 
     fn load_embedding_model(device: &Device) -> Result<(Option<BertModel>, Option<Tokenizer>)> {
@@ -290,7 +262,7 @@ impl KaranaAI {
         Ok((Some(model), Some(tokenizer)))
     }
 
-    fn load_gen_model() -> Result<(Option<QLlama>, Option<Tokenizer>)> {
+    fn load_gen_model(device: &Device) -> Result<(Option<QLlama>, Option<Tokenizer>)> {
         // Check local cache first
         let cache_dir = PathBuf::from("karana-cache/models");
         let model_path = cache_dir.join(MODEL_FILE);
@@ -308,8 +280,9 @@ impl KaranaAI {
         // Load GGUF
         let mut file = std::fs::File::open(&model_path)?;
         let model = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(
-            &mut file, 
-            &mut file // Reader
+            candle_core::quantized::gguf_file::Content::read(&mut file)?, 
+            &mut file, // Reader
+            device
         )?;
 
         // Load Tokenizer (Fetch from HF if needed, or assume it's cached)
@@ -361,7 +334,7 @@ impl KaranaAI {
     pub fn predict(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
         // Lazy load check
         if self.gen_model.is_none() {
-             let (m, t) = Self::load_gen_model().unwrap_or((None, None));
+             let (m, t) = Self::load_gen_model(&self.device).unwrap_or((None, None));
              self.gen_model = m;
              self.gen_tokenizer = t;
         }
@@ -413,7 +386,7 @@ impl KaranaAI {
     pub fn suggest_ar_actions(&mut self, context: &str) -> Result<Vec<String>> {
         if self.gen_model.is_none() {
              // Try load one last time
-             let (m, t) = Self::load_gen_model().unwrap_or((None, None));
+             let (m, t) = Self::load_gen_model(&self.device).unwrap_or((None, None));
              self.gen_model = m;
              self.gen_tokenizer = t;
         }

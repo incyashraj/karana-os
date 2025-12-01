@@ -26,14 +26,21 @@ enum SwarmCmd {
     ZkDial { peer: Multiaddr, #[allow(dead_code)] proof: Vec<u8> },
 }
 
+#[derive(Debug, Clone)]
+pub enum KaranaSwarmEvent {
+    BlockReceived(ChainBlock),
+    GenericMessage(String),
+}
+
 #[derive(Clone)]
 pub struct KaranaSwarm {
     cmd_tx: mpsc::Sender<SwarmCmd>,
+    event_rx: Arc<Mutex<mpsc::Receiver<KaranaSwarmEvent>>>,
     ai: Arc<Mutex<KaranaAI>>,
 }
 
 impl KaranaSwarm {
-    pub async fn new(ai: Arc<Mutex<KaranaAI>>) -> Result<Self> {
+    pub async fn new(ai: Arc<Mutex<KaranaAI>>, port: u16, peer: Option<String>) -> Result<Self> {
         let mut swarm = SwarmBuilder::with_new_identity()
             .with_tokio()
             .with_tcp(
@@ -83,11 +90,21 @@ impl KaranaSwarm {
         }
 
         let (cmd_tx, mut cmd_rx) = mpsc::channel::<SwarmCmd>(32);
+        let (event_tx, event_rx) = mpsc::channel::<KaranaSwarmEvent>(32);
 
         // Spawn the network task
         tokio::spawn(async move {
             // Listen on all interfaces
-            let _ = swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap());
+            let listen_addr = format!("/ip4/0.0.0.0/tcp/{}", port);
+            let _ = swarm.listen_on(listen_addr.parse().unwrap());
+
+            // Dial peer if provided
+            if let Some(addr_str) = peer {
+                if let Ok(addr) = addr_str.parse::<Multiaddr>() {
+                    log::info!("Atom 6 (P2P): Dialing bootstrap peer: {:?}", addr);
+                    let _ = swarm.dial(addr);
+                }
+            }
 
             loop {
                 tokio::select! {
@@ -104,6 +121,13 @@ impl KaranaSwarm {
                         },
                         SwarmEvent::Behaviour(KaranaBehaviourEvent::Gossipsub(gossipsub::Event::Message { propagation_source: peer_id, message_id: id, message })) => {
                             log::info!("Atom 6 (P2P): Got message: '{}' with id: {} from peer: {:?}", String::from_utf8_lossy(&message.data), id, peer_id);
+                            
+                            // Try to deserialize as Block
+                            if let Ok(block) = serde_json::from_slice::<ChainBlock>(&message.data) {
+                                let _ = event_tx.send(KaranaSwarmEvent::BlockReceived(block)).await;
+                            } else {
+                                let _ = event_tx.send(KaranaSwarmEvent::GenericMessage(String::from_utf8_lossy(&message.data).to_string())).await;
+                            }
                         },
                         SwarmEvent::Behaviour(KaranaBehaviourEvent::Kad(_event)) => {
                              // log::info!("Atom 6 (P2P): DHT Event: {:?}", event);
@@ -133,7 +157,15 @@ impl KaranaSwarm {
             }
         });
 
-        Ok(Self { cmd_tx, ai })
+        Ok(Self { cmd_tx, event_rx: Arc::new(Mutex::new(event_rx)), ai })
+    }
+
+    pub fn poll_event(&self) -> Option<KaranaSwarmEvent> {
+        if let Ok(mut rx) = self.event_rx.lock() {
+            rx.try_recv().ok()
+        } else {
+            None
+        }
     }
 
     pub async fn broadcast_block(&self, block: &StorageBlob) -> Result<()> {

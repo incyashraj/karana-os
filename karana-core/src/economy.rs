@@ -37,6 +37,22 @@ impl Ledger {
         log::info!("Atom 4 (Economy): 🪙 Minted {} KARA to Node '{}'. Balance: {} | Staked: {}", amount, recipient, account.balance, account.staked);
     }
 
+    pub fn transfer(&mut self, sender: &str, recipient: &str, amount: u128) -> Result<()> {
+        let mut sender_acc = self.get_account(sender);
+        if sender_acc.balance < amount {
+            return Err(anyhow::anyhow!("Insufficient balance"));
+        }
+        let mut recipient_acc = self.get_account(recipient);
+        
+        sender_acc.balance -= amount;
+        recipient_acc.balance += amount;
+        
+        self.save_account(sender, &sender_acc);
+        self.save_account(recipient, &recipient_acc);
+        log::info!("Atom 4 (Economy): 💸 Transferred {} KARA from '{}' to '{}'", amount, sender, recipient);
+        Ok(())
+    }
+
     pub fn stake(&mut self, account_id: &str, amount: u128) -> Result<()> {
         let mut account = self.get_account(account_id);
         if account.balance < amount {

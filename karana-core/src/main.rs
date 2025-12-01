@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use karana_core::monad::KaranaMonad;
+use karana_core::monad::{KaranaMonad, KaranaConfig};
 use karana_core::installer::{Cli, Commands, run_install};
 
 #[tokio::main]
@@ -12,9 +12,24 @@ async fn main() -> Result<()> {
         Some(Commands::Install { mode }) => {
             run_install(mode)?;
         }
-        Some(Commands::Boot) | None => {
+        Some(Commands::Boot { port, peer, path }) => {
             // Default behavior: Boot the OS Kernel
-            let mut monad = KaranaMonad::new().await?;
+            let config = KaranaConfig {
+                port,
+                peer,
+                base_path: path.unwrap_or_else(|| ".".to_string()),
+            };
+            let mut monad = KaranaMonad::new(config).await?;
+            monad.ignite().await?;
+        }
+        None => {
+             // Fallback for None (should match Boot default)
+             let config = KaranaConfig {
+                port: 0,
+                peer: None,
+                base_path: ".".to_string(),
+            };
+            let mut monad = KaranaMonad::new(config).await?;
             monad.ignite().await?;
         }
     }

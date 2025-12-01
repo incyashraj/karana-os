@@ -51,10 +51,7 @@ pub struct KaranaBoot {
 }
 
 impl KaranaBoot {
-    pub async fn new(ai: Arc<Mutex<KaranaAI>>) -> Result<Self> {
-        // Initialize Swarm
-        let swarm = KaranaSwarm::new(ai.clone()).await?;
-
+    pub async fn new(ai: Arc<Mutex<KaranaAI>>, swarm: KaranaSwarm) -> Result<Self> {
         // Setup ZK Circuit Keys (One-time setup for demo)
         let mut rng = thread_rng();
         let circuit = BootCircuit::<Fr> { path: None, hash: None };

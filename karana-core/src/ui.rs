@@ -221,7 +221,7 @@ impl KaranaUI {
             let ai = self.ai_render.clone();
             // Spawn blocking task to download model
             let res = tokio::task::spawn_blocking(move || {
-                let mut ai_locked = ai.lock().unwrap();
+                let ai_locked = ai.lock().unwrap();
                 ai_locked.download_model()
             }).await??;
             res

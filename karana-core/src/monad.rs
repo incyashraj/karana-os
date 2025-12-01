@@ -7,12 +7,12 @@ use crate::runtime::KaranaActor as RuntimeActor;
 use crate::ui::KaranaUI;
 use crate::vigil::KaranaVeil;
 use crate::storage::KaranaStorage;
-use crate::net::KaranaSwarm;
+use crate::net::{KaranaSwarm, KaranaSwarmEvent};
 use crate::ai::KaranaAI;
 use crate::zk::setup_zk;
 use crate::economy::{Ledger, ProofOfStorage, Governance};
 use crate::gov::KaranaDAO;
-use crate::chain::{ChainState, Transaction, Block};
+use crate::chain::{Blockchain, Transaction, TransactionData, Block};
 use crate::state::KaranaPersist;
 use crate::hardware::KaranaHardware;
 use alloy_primitives::U256;
@@ -31,20 +31,26 @@ pub struct KaranaMonad {
     pos: Arc<ProofOfStorage>,
     gov: Arc<Mutex<Governance>>,
     dao: Arc<Mutex<KaranaDAO>>,
-    chain_state: Arc<Mutex<ChainState>>,
+    chain: Arc<Blockchain>,
     mempool: Arc<Mutex<Vec<Transaction>>>,
     persist: Arc<KaranaPersist>,
     hardware: Arc<KaranaHardware>,
 }
 
 
+pub struct KaranaConfig {
+    pub port: u16,
+    pub peer: Option<String>,
+    pub base_path: String,
+}
+
 impl KaranaMonad {
-    pub async fn new() -> Result<Self> {
+    pub async fn new(config: KaranaConfig) -> Result<Self> {
         // Chroot detect: If /proc/1/cwd is jail (or env var set), adjust paths
         // In this prototype env, we use an env var or check if /proc exists (it usually does in containers)
         // We'll use a marker file or env var for reliability.
         let is_chroot = std::env::var("KARANA_CHROOT").is_ok();
-        let base_path = if is_chroot { "/var/karana" } else { "." };
+        let base_path = if is_chroot { "/var/karana".to_string() } else { config.base_path.clone() };
         
         if is_chroot {
             log::info!("Atom 5 (Chroot): Initializing in Sovereign Jail at {}", base_path);
@@ -58,8 +64,9 @@ impl KaranaMonad {
         let ai = Arc::new(Mutex::new(KaranaAI::new().context("AI Ignition failed")?));
 
         // Atom 4: Boot Process (Initializes Swarm)
-        let boot_struct = KaranaBoot::new(ai.clone()).await?;
-        let swarm = Arc::new(boot_struct.swarm.clone());
+        let swarm_inner = KaranaSwarm::new(ai.clone(), config.port, config.peer).await?;
+        let boot_struct = KaranaBoot::new(ai.clone(), swarm_inner.clone()).await?;
+        let swarm = Arc::new(swarm_inner);
         let boot = Arc::new(boot_struct);
 
         let storage_path = format!("{}/karana-cache", base_path);
@@ -85,8 +92,8 @@ impl KaranaMonad {
         // Atom 7: Vigil (Needs Ledger for Slashing)
         let vigil = Arc::new(KaranaVeil::new(ai.clone(), &runtime, ledger.clone())?);
 
-        // Phase 7: Sovereign Chain State
-        let chain_state = Arc::new(Mutex::new(ChainState::new()));
+        // Phase 7: Sovereign Chain State (Persistent)
+        let chain = Arc::new(Blockchain::new(ledger.clone(), gov.clone()));
         let mempool = Arc::new(Mutex::new(Vec::new()));
 
         // Phase v1.0: Persistent State
@@ -104,7 +111,7 @@ impl KaranaMonad {
             pos,
             gov,
             dao,
-            chain_state,
+            chain,
             mempool,
             persist,
             hardware,
@@ -232,15 +239,22 @@ impl KaranaMonad {
         let mut height = 1;
         let mut parent_hash = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
 
-        // Bootstrap Chain State
-        {
-            let mut state = self.chain_state.lock().unwrap();
-            state.balances.insert("Node-Alpha".to_string(), U256::from(1000u64));
-        }
-
         let mut last_block_time = std::time::Instant::now();
 
         loop {
+            // Check for Swarm Events
+            if let Some(event) = self.swarm.poll_event() {
+                match event {
+                    KaranaSwarmEvent::BlockReceived(block) => {
+                        log::info!("Atom 6 (P2P): Received Block #{} from Swarm", block.header.height);
+                        // In a real node, we would validate and add to chain if it's the next block
+                    },
+                    KaranaSwarmEvent::GenericMessage(msg) => {
+                        log::info!("Atom 6 (P2P): Message: {}", msg);
+                    }
+                }
+            }
+
             // Check for UI Intents
             if let Some(intent) = self.ui.poll_intent() {
                 if intent == "quit" {
@@ -278,7 +292,12 @@ impl KaranaMonad {
                     let mut pool = self.mempool.lock().unwrap();
                     // Simulate a transaction every block for liveness
                     if height % 2 == 0 {
-                        txs.push(Transaction::Transfer { to: "Node-Beta".to_string(), amount: U256::from(10u64) });
+                        txs.push(Transaction {
+                            sender: "Node-Alpha".to_string(),
+                            data: TransactionData::Transfer { to: "Node-Beta".to_string(), amount: 10u128 },
+                            signature: "mock_sig".to_string(),
+                            nonce: height,
+                        });
                     }
                     txs.append(&mut pool);
                 }
@@ -290,18 +309,25 @@ impl KaranaMonad {
                 // Update UI
                 self.ui.update_height(height);
 
+                // Validate Block
+                if let Err(e) = block.validate(&parent_hash) {
+                    log::error!("Atom 1 (Chain): Block Validation Failed: {}", e);
+                    continue;
+                }
+
                 // Apply Block
-                {
-                    let mut state = self.chain_state.lock().unwrap();
-                    for tx in &block.transactions {
-                        // For now, assume sender is "Node-Alpha" (simplified)
-                        if let Err(e) = state.apply(tx, "Node-Alpha") {
-                            log::info!("Atom 1 (Chain): Tx Failed: {}", e);
-                        } else {
-                            log::info!("Atom 1 (Chain): Tx Applied: {:?}", tx);
-                        }
+                if let Err(e) = self.chain.apply_block(&block) {
+                    log::error!("Atom 1 (Chain): Block Application Failed: {}", e);
+                } else {
+                    log::info!("Atom 1 (Chain): Block #{} Applied Successfully. Hash: {}", height, block.hash);
+                    // Persist Block
+                    if let Err(e) = self.storage.persist_block(&block) {
+                        log::error!("Atom 1 (Chain): Failed to persist block: {}", e);
                     }
-                    log::info!("Atom 1 (Chain): State Root: {}", state.calculate_root());
+                    // Broadcast Block
+                    if let Err(e) = self.swarm.broadcast_chain_block(&block).await {
+                        log::error!("Atom 6 (P2P): Failed to broadcast block: {}", e);
+                    }
                 }
                 
                 parent_hash = block.hash;

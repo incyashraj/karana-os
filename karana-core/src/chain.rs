@@ -1,16 +1,33 @@
 use serde::{Serialize, Deserialize};
-use alloy_primitives::U256;
 use sha2::{Sha256, Digest};
-use std::collections::HashMap;
-use crate::gov::Proposal;
-use crate::storage::MerkleTree;
+use std::sync::{Arc, Mutex};
+use crate::economy::{Ledger, Governance};
+use anyhow::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Transaction {
-    Transfer { to: String, amount: U256 },
-    Stake { amount: U256 },
+pub enum TransactionData {
+    Transfer { to: String, amount: u128 },
+    Stake { amount: u128 },
     Propose { title: String, description: String },
-    Vote { proposal_id: u32, approve: bool },
+    Vote { proposal_id: u64, approve: bool },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transaction {
+    pub sender: String,
+    pub data: TransactionData,
+    pub signature: String, // Hex encoded signature
+    pub nonce: u64,
+}
+
+impl Transaction {
+    pub fn verify(&self) -> bool {
+        // In a real implementation, we would:
+        // 1. Serialize (sender, data, nonce)
+        // 2. Verify signature against sender's public key (assumed to be 'sender' here)
+        // For this prototype, we assume if signature is present, it's valid.
+        !self.signature.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +53,7 @@ impl Block {
                 parent_hash,
                 height,
                 timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
-                state_root: String::new(), // Placeholder for Merkle root
+                state_root: String::new(), // Placeholder
                 validator,
             },
             transactions,
@@ -55,89 +72,51 @@ impl Block {
         }
         hex::encode(hasher.finalize())
     }
-}
 
-// The Sovereign State Machine
-#[derive(Default)]
-pub struct ChainState {
-    pub balances: HashMap<String, U256>,
-    pub staked: HashMap<String, U256>,
-    pub proposals: HashMap<u32, Proposal>,
-    pub next_proposal_id: u32,
-}
-
-impl ChainState {
-    pub fn new() -> Self {
-        Self {
-            balances: HashMap::new(),
-            staked: HashMap::new(),
-            proposals: HashMap::new(),
-            next_proposal_id: 0,
+    pub fn validate(&self, parent_hash: &str) -> Result<()> {
+        if self.header.parent_hash != parent_hash {
+            return Err(anyhow::anyhow!("Invalid parent hash"));
         }
-    }
-
-    pub fn apply(&mut self, tx: &Transaction, sender: &str) -> anyhow::Result<()> {
-        match tx {
-            Transaction::Transfer { to, amount } => {
-                let balance = self.balances.entry(sender.to_string()).or_default();
-                if *balance < *amount { return Err(anyhow::anyhow!("Insufficient funds")); }
-                *balance -= *amount;
-                *self.balances.entry(to.clone()).or_default() += *amount;
-            }
-            Transaction::Stake { amount } => {
-                let balance = self.balances.entry(sender.to_string()).or_default();
-                if *balance < *amount { return Err(anyhow::anyhow!("Insufficient funds to stake")); }
-                *balance -= *amount;
-                *self.staked.entry(sender.to_string()).or_default() += *amount;
-            }
-            Transaction::Propose { title, description } => {
-                let id = self.next_proposal_id;
-                self.next_proposal_id += 1;
-                self.proposals.insert(id, Proposal {
-                    id,
-                    title: title.clone(),
-                    description: description.clone(),
-                    yes_votes: U256::ZERO,
-                    no_votes: U256::ZERO,
-                    quorum: U256::from(100u64),
-                });
-            }
-            Transaction::Vote { proposal_id, approve } => {
-                let stake = self.staked.get(sender).cloned().unwrap_or(U256::ZERO);
-                if stake == U256::ZERO { return Err(anyhow::anyhow!("No stake")); }
-                
-                if let Some(prop) = self.proposals.get_mut(proposal_id) {
-                    if *approve { prop.yes_votes += stake; } else { prop.no_votes += stake; }
-                }
+        if self.calculate_hash() != self.hash {
+            return Err(anyhow::anyhow!("Invalid block hash"));
+        }
+        for tx in &self.transactions {
+            if !tx.verify() {
+                return Err(anyhow::anyhow!("Invalid transaction signature"));
             }
         }
         Ok(())
     }
+}
 
-    pub fn calculate_root(&self) -> String {
-        // Deterministic serialization: Sort keys
-        let mut data = Vec::new();
-        
-        let mut balances_vec: Vec<_> = self.balances.iter().collect();
-        balances_vec.sort_by_key(|k| k.0);
-        for (k, v) in balances_vec {
-            data.extend_from_slice(k.as_bytes());
-            data.extend_from_slice(&v.to_be_bytes::<32>());
-        }
+pub struct Blockchain {
+    ledger: Arc<Mutex<Ledger>>,
+    gov: Arc<Mutex<Governance>>,
+}
 
-        let mut staked_vec: Vec<_> = self.staked.iter().collect();
-        staked_vec.sort_by_key(|k| k.0);
-        for (k, v) in staked_vec {
-            data.extend_from_slice(k.as_bytes());
-            data.extend_from_slice(&v.to_be_bytes::<32>());
-        }
-        
-        // If empty, return empty hash
-        if data.is_empty() {
-            return hex::encode(Sha256::digest(b"").to_vec());
-        }
+impl Blockchain {
+    pub fn new(ledger: Arc<Mutex<Ledger>>, gov: Arc<Mutex<Governance>>) -> Self {
+        Self { ledger, gov }
+    }
 
-        let tree = MerkleTree::new(&data);
-        hex::encode(tree.root)
+    pub fn apply_block(&self, block: &Block) -> Result<()> {
+        for tx in &block.transactions {
+            match &tx.data {
+                TransactionData::Transfer { to, amount } => {
+                    self.ledger.lock().unwrap().transfer(&tx.sender, to, *amount)?;
+                }
+                TransactionData::Stake { amount } => {
+                    self.ledger.lock().unwrap().stake(&tx.sender, *amount)?;
+                }
+                TransactionData::Propose { title: _, description } => {
+                    // Title ignored in economy::Governance for now
+                    self.gov.lock().unwrap().create_proposal(description);
+                }
+                TransactionData::Vote { proposal_id, approve } => {
+                    self.gov.lock().unwrap().vote(*proposal_id, &tx.sender, *approve)?;
+                }
+            }
+        }
+        Ok(())
     }
 }

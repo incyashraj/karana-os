@@ -106,7 +106,7 @@ impl KaranaHardware {
                 Ok(format!("Charging Sim: {}", pm.battery.is_charging))
             },
             "gaze status" => {
-                let mut input = self.input.lock().unwrap();
+                let input = self.input.lock().unwrap();
                 // input.simulate_random_gaze(); // Removed simulation here, UI loop handles it or real mouse
                 Ok(format!("Gaze: ({:.2}, {:.2})", input.last_gaze.0, input.last_gaze.1))
             },

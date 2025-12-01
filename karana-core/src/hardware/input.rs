@@ -1,5 +1,4 @@
 use serde::{Serialize, Deserialize};
-use std::sync::{Arc, Mutex};
 use std::path::Path;
 use std::fs::File;
 use symphonia::core::io::MediaSourceStream;
@@ -83,7 +82,7 @@ impl MultimodalInput {
                         // log::warn!("Audio sample rate is {}, Whisper expects 16000. Results may be poor.", spec.rate);
                     }
 
-                    let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity(), spec);
+                    let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
                     sample_buf.copy_interleaved_ref(decoded);
                     
                     // Convert to mono (average channels)

@@ -19,7 +19,19 @@ pub enum Commands {
         mode: String, // live, disk, vm
     },
     /// Start the OS Kernel (Default)
-    Boot,
+    Boot {
+        /// P2P Port to listen on
+        #[arg(long, default_value = "0")]
+        port: u16,
+        
+        /// Peer address to dial (Multiaddr)
+        #[arg(long)]
+        peer: Option<String>,
+        
+        /// Custom storage path (for multi-node sim)
+        #[arg(long)]
+        path: Option<String>,
+    },
 }
 
 pub fn run_install(mode: String) -> Result<()> {

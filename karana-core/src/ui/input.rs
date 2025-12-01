@@ -22,7 +22,7 @@ impl MultimodalInput {
         // let samples: Vec<f32> = reader.samples::<f32>().map(|s| s.unwrap()).collect();
         
         // Simulate transcript
-        let transcript = "optimize storage";
+        let _transcript = "optimize storage";
         let intent = "Shard 60% local"; // Simulated AI parse
         
         // ZK-sign: Prove audio hash

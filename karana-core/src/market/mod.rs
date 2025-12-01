@@ -20,6 +20,7 @@ pub struct IntentResult {
 
 pub struct KaranaBazaar {
     apps: HashMap<String, IntentResult>,
+    #[allow(dead_code)]
     ai: Arc<Mutex<KaranaAI>>,
 }
 

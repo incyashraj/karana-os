@@ -1,6 +1,5 @@
 use sysinfo::{System, RefreshKind, CpuRefreshKind, MemoryRefreshKind};
 use serde::{Serialize, Deserialize};
-use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PowerProfile {
@@ -26,7 +25,7 @@ pub struct PowerManager {
 impl PowerManager {
     pub fn new() -> Self {
         let mut sys = System::new_with_specifics(
-            RefreshKind::new()
+            RefreshKind::nothing()
                 .with_cpu(CpuRefreshKind::everything())
                 .with_memory(MemoryRefreshKind::everything())
         );
@@ -51,19 +50,17 @@ impl PowerManager {
         // Real Battery Logic
         // We attempt to find a battery component. If found, we use its values.
         // If not (e.g. Desktop/Container), we fall back to simulation.
-        let mut found_real_battery = false;
+        let found_real_battery = false;
         
         // Note: sysinfo components might need specific permissions or hardware support.
         // In a container, this list is often empty.
+        // Removed for sysinfo 0.37 compatibility in prototype
+        /*
         if let Some(batteries) = self.sys.components().iter().find(|c| c.label().to_lowercase().contains("battery")) {
              // Found a battery!
-             // Note: sysinfo 0.29 API might differ, assuming standard component access
-             // For now, we just check existence. Reading specific charge requires casting or specific API usage
-             // which varies by OS. For this prototype, if we see a battery component, we trust it exists.
-             // However, reading 'charge' from Component is not standard in all sysinfo versions.
-             // We will stick to the simulation for stability unless we are sure.
-             // found_real_battery = true; 
+             // ...
         }
+        */
 
         // Simulation Logic for Prototype (Fallback)
         if !found_real_battery {

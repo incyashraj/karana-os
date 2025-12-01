@@ -4,7 +4,9 @@
 
 // #[derive(Clone, Data, Default)]
 pub struct UiData {
+    #[allow(dead_code)]
     intent: String,
+    #[allow(dead_code)]
     rendered: String,
 }
 

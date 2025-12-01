@@ -1,8 +1,6 @@
 use anyhow::Result;
-use evdev::{Device, EventType, InputEvent, Key};
+use evdev::{Device, EventType};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 pub struct HapticEngine {
     device: Option<Device>,
@@ -52,13 +50,11 @@ impl HapticEngine {
     }
 
     pub fn vibrate(&mut self, duration_ms: u16, intensity: u16) -> Result<()> {
-        if let Some(dev) = &mut self.device {
+        if self.device.is_some() {
             // Real Haptics via evdev
             // Note: Simple Rumble effect
             // This requires uploading an effect to the device.
             // For simplicity in this prototype, we'll try a simple rumble if supported.
-            
-            use evdev::{AttributeSet, FfEffectType};
             
             // Construct a Rumble Effect
             // Note: evdev-rs / evdev crate API for FF is complex.
