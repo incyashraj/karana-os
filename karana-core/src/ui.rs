@@ -272,6 +272,10 @@ impl KaranaUI {
             }).await??;
             
             res
+        } else if input.starts_with("offload") {
+            let prompt = input.replace("offload", "").trim().to_string();
+            let req_id = self.swarm.send_ai_request(prompt.clone()).await?;
+            format!("Offloaded AI Task '{}' to Swarm. Request ID: {}", prompt, req_id)
         } else if input.starts_with("install") || input.starts_with("download") || input.starts_with("get") {
             let app_id = input.replace("install", "")
                               .replace("download", "")

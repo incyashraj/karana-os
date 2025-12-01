@@ -251,6 +251,22 @@ impl KaranaMonad {
                     },
                     KaranaSwarmEvent::GenericMessage(msg) => {
                         log::info!("Atom 6 (P2P): Message: {}", msg);
+                    },
+                    KaranaSwarmEvent::AIRequestReceived(req) => {
+                        log::info!("Atom 6 (P2P): Processing AI Request from {}: '{}'", req.requester_peer_id, req.prompt);
+                        // Offload compute to our local AI
+                        let result = match self.ai.lock().unwrap().predict(&req.prompt, 100) {
+                            Ok(r) => r,
+                            Err(e) => format!("Compute Error: {}", e),
+                        };
+                        if let Err(e) = self.swarm.send_ai_response(req.request_id, result).await {
+                            log::error!("Atom 6 (P2P): Failed to send AI response: {}", e);
+                        }
+                    },
+                    KaranaSwarmEvent::AIResponseReceived(res) => {
+                        log::info!("Atom 6 (P2P): Received AI Result [{}]: {}", res.request_id, res.result);
+                        // Notify UI
+                        let _ = self.ui.render_intent(format!("Swarm AI Result: {}", res.result), vec![]).await;
                     }
                 }
             }

@@ -14,6 +14,21 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AIComputeRequest {
+    pub request_id: String,
+    pub prompt: String,
+    pub requester_peer_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AIComputeResponse {
+    pub request_id: String,
+    pub result: String,
+}
+
 #[derive(NetworkBehaviour)]
 struct KaranaBehaviour {
     gossipsub: gossipsub::Behaviour,
@@ -24,12 +39,16 @@ struct KaranaBehaviour {
 enum SwarmCmd {
     Broadcast(Vec<u8>),
     ZkDial { peer: Multiaddr, #[allow(dead_code)] proof: Vec<u8> },
+    SendAIRequest(AIComputeRequest),
+    SendAIResponse(AIComputeResponse),
 }
 
 #[derive(Debug, Clone)]
 pub enum KaranaSwarmEvent {
     BlockReceived(ChainBlock),
     GenericMessage(String),
+    AIRequestReceived(AIComputeRequest),
+    AIResponseReceived(AIComputeResponse),
 }
 
 #[derive(Clone)]
@@ -125,6 +144,12 @@ impl KaranaSwarm {
                             // Try to deserialize as Block
                             if let Ok(block) = serde_json::from_slice::<ChainBlock>(&message.data) {
                                 let _ = event_tx.send(KaranaSwarmEvent::BlockReceived(block)).await;
+                            } else if let Ok(req) = serde_json::from_slice::<AIComputeRequest>(&message.data) {
+                                log::info!("Atom 6 (P2P): Received AI Compute Request: {}", req.request_id);
+                                let _ = event_tx.send(KaranaSwarmEvent::AIRequestReceived(req)).await;
+                            } else if let Ok(res) = serde_json::from_slice::<AIComputeResponse>(&message.data) {
+                                log::info!("Atom 6 (P2P): Received AI Compute Response: {}", res.request_id);
+                                let _ = event_tx.send(KaranaSwarmEvent::AIResponseReceived(res)).await;
                             } else {
                                 let _ = event_tx.send(KaranaSwarmEvent::GenericMessage(String::from_utf8_lossy(&message.data).to_string())).await;
                             }
@@ -140,6 +165,22 @@ impl KaranaSwarm {
                                 let topic = gossipsub::IdentTopic::new("karana-blocks");
                                 if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
                                     log::info!("Atom 6 (P2P): Publish error: {:?}", e);
+                                }
+                            },
+                            SwarmCmd::SendAIRequest(req) => {
+                                let topic = gossipsub::IdentTopic::new("karana-blocks"); // Reuse topic for now
+                                if let Ok(data) = serde_json::to_vec(&req) {
+                                    if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
+                                        log::info!("Atom 6 (P2P): AI Request Publish error: {:?}", e);
+                                    }
+                                }
+                            },
+                            SwarmCmd::SendAIResponse(res) => {
+                                let topic = gossipsub::IdentTopic::new("karana-blocks");
+                                if let Ok(data) = serde_json::to_vec(&res) {
+                                    if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
+                                        log::info!("Atom 6 (P2P): AI Response Publish error: {:?}", e);
+                                    }
                                 }
                             },
                             SwarmCmd::ZkDial { peer, proof: _ } => {
@@ -220,6 +261,26 @@ impl KaranaSwarm {
         
         log::info!("Atom 6 (P2P): Sending ZK Proof (Size: {} bytes) to prove intent...", proof.len());
         self.cmd_tx.send(SwarmCmd::ZkDial { peer, proof }).await?;
+        Ok(())
+    }
+
+    pub async fn send_ai_request(&self, prompt: String) -> Result<String> {
+        let req_id = uuid::Uuid::new_v4().to_string();
+        let req = AIComputeRequest {
+            request_id: req_id.clone(),
+            prompt,
+            requester_peer_id: "self".to_string(), // In real P2P, use actual PeerId
+        };
+        self.cmd_tx.send(SwarmCmd::SendAIRequest(req)).await?;
+        Ok(req_id)
+    }
+
+    pub async fn send_ai_response(&self, request_id: String, result: String) -> Result<()> {
+        let res = AIComputeResponse {
+            request_id,
+            result,
+        };
+        self.cmd_tx.send(SwarmCmd::SendAIResponse(res)).await?;
         Ok(())
     }
 }
