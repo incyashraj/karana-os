@@ -33,11 +33,6 @@ for dir in "${DIRS[@]}"; do
     if [ ! -d "$dir" ]; then
         echo "   Creating $dir..."
         mkdir -p "$dir"
-        # Initialize basic structure for RocksDB/Btrfs simulation
-        touch "$dir/MANIFEST-000001"
-        touch "$dir/CURRENT"
-        touch "$dir/LOCK"
-        touch "$dir/LOG"
     fi
 done
 
