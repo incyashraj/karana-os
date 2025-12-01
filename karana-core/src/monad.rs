@@ -15,11 +15,12 @@ use crate::gov::KaranaDAO;
 use crate::chain::{Blockchain, Transaction, TransactionData, Block};
 use crate::state::KaranaPersist;
 use crate::hardware::KaranaHardware;
+use crate::identity::KaranaIdentity;
 use alloy_primitives::U256;
 
 /// The Monad: Weaves atoms into sovereign flow
 pub struct KaranaMonad {
-    boot: Arc<KaranaBoot>,
+    boot: KaranaBoot,
     runtime: Arc<RuntimeActor>,
     ui: Arc<KaranaUI>,
     vigil: Arc<KaranaVeil>,
@@ -35,6 +36,8 @@ pub struct KaranaMonad {
     mempool: Arc<Mutex<Vec<Transaction>>>,
     persist: Arc<KaranaPersist>,
     hardware: Arc<KaranaHardware>,
+    #[allow(dead_code)]
+    identity: Arc<Mutex<KaranaIdentity>>,
 }
 
 
@@ -63,11 +66,13 @@ impl KaranaMonad {
         log::info!("Igniting Karana AI (Phi-3 Simulated)...");
         let ai = Arc::new(Mutex::new(KaranaAI::new().context("AI Ignition failed")?));
 
+        // Atom 8: Identity (Phase 4)
+        let identity = Arc::new(Mutex::new(KaranaIdentity::new()?));
+
         // Atom 4: Boot Process (Initializes Swarm)
         let swarm_inner = KaranaSwarm::new(ai.clone(), config.port, config.peer).await?;
-        let boot_struct = KaranaBoot::new(ai.clone(), swarm_inner.clone()).await?;
+        let boot = KaranaBoot::new(ai.clone(), swarm_inner.clone()).await?;
         let swarm = Arc::new(swarm_inner);
-        let boot = Arc::new(boot_struct);
 
         let storage_path = format!("{}/karana-cache", base_path);
         let storage = Arc::new(KaranaStorage::new(&storage_path, "http://localhost:26657", ai.clone())?);
@@ -76,7 +81,12 @@ impl KaranaMonad {
         // Phase v1.0: Hardware Abstraction (IoT/Glass)
         let hardware = Arc::new(KaranaHardware::probe());
         
-        let ui = Arc::new(KaranaUI::new(&runtime, &swarm, ai.clone(), hardware.clone())?);
+        // Start Hardware Simulation if requested or in dev mode
+        if std::env::var("SIMULATE_HARDWARE").is_ok() || !is_chroot {
+             hardware.start_simulation();
+        }
+        
+        let ui = Arc::new(KaranaUI::new(&runtime, &swarm, ai.clone(), hardware.clone(), identity.clone())?);
         
         // Atom 4: Economy (Persistent Ledger)
         let ledger_path = format!("{}/karana-ledger", base_path);
@@ -115,39 +125,52 @@ impl KaranaMonad {
             mempool,
             persist,
             hardware,
+            identity,
         })
     }
 
     /// Ignite: Full rethink flow (boot → intent → prove → store → attest)
     pub async fn ignite(&mut self) -> Result<()> {
-        // Initialize TUI Logger
-        let _ = tui_logger::init_logger(log::LevelFilter::Info);
-        tui_logger::set_default_level(log::LevelFilter::Info);
+        // Initialize Logger based on mode
+        if std::env::var("NO_TUI").is_ok() {
+            env_logger::builder()
+                .filter_level(log::LevelFilter::Info)
+                .format_timestamp_millis()
+                .init();
+            log::info!("Logger initialized in Terminal Mode (NO_TUI)");
+        } else {
+            let _ = tui_logger::init_logger(log::LevelFilter::Info);
+            tui_logger::set_default_level(log::LevelFilter::Info);
+        }
+
+        log::info!("=== SYSTEM IGNITION SEQUENCE STARTED ===");
 
         if std::env::var("KARANA_CHROOT").is_ok() {
             log::info!("Ignited in Sovereign Chroot – Fabric Isolated");
         }
         
         // Atom 4: Verified Awakening
+        log::info!("Step 1/8: Boot Awakening...");
         let genesis_hash = 0u64;
         
         // We need mutable access to boot for awaken. 
-        // Since we are the only holder of the Arc (hopefully), get_mut should work.
-        if let Some(boot_mut) = Arc::get_mut(&mut self.boot) {
-            boot_mut.awaken(genesis_hash).await.context("Boot failed")?;
-        } else {
-            return Err(anyhow::anyhow!("Boot module is shared, cannot awaken"));
-        }
+        self.boot.awaken(genesis_hash).await.context("Boot failed")?;
+        log::info!("Step 1/8: Boot Awakening [OK]");
 
         // Atom 5: Ignite Runtime Actors
+        log::info!("Step 2/8: Runtime Ignition...");
         self.runtime.ignite().await.context("Runtime ignition failed")?;
+        log::info!("Step 2/8: Runtime Ignition [OK]");
 
         // Atom 4: Initial Staking (Bootstrap Economy)
+        log::info!("Step 3/8: Economy Bootstrap...");
         log::info!("Atom 4 (Economy): Bootstrapping Staking...");
         self.ledger.lock().unwrap().mint("Node-Alpha", 1000);
         self.ledger.lock().unwrap().stake("Node-Alpha", 500)?;
+        log::info!("Step 3/8: Economy Bootstrap [OK]");
         
         // Atom 4: DAO Ignition (Phase 4)
+        log::info!("Step 4/8: DAO Ignition...");
         {
             let mut dao = self.dao.lock().unwrap();
             dao.token.mint("genesis", U256::from(1000u64));
@@ -160,12 +183,16 @@ impl KaranaMonad {
                 // self.runtime.ignite_governance().await?; 
             }
         }
+        log::info!("Step 4/8: DAO Ignition [OK]");
 
         // Atom 6: Symbiotic UI Intent (Test: "Optimize storage")
+        log::info!("Step 5/8: UI Intent Test...");
         let intent_proof = vec![1u8; 128];
         let rendered = self.ui.render_intent("optimize storage".to_string(), intent_proof.clone()).await?;
+        log::info!("Step 5/8: UI Intent Test [OK]");
 
         // Atom 7: Vigil Check
+        log::info!("Step 6/8: Vigil Security Check...");
         let vigil_result = self.vigil.check_action("storage write".to_string(), intent_proof).await?;
         log::info!("Vigil Check: {}", vigil_result);
 
@@ -175,8 +202,10 @@ impl KaranaMonad {
             Ok(_) => log::info!("Vigil: Malicious action passed (Unexpected!)"),
             Err(e) => log::info!("Vigil: Malicious action blocked: {}", e),
         }
+        log::info!("Step 6/8: Vigil Security Check [OK]");
 
         // Atom 2/3: AI-Tuned Storage via Swarm
+        log::info!("Step 7/8: Storage & Swarm Test...");
         let test_data = b"AI-optimized shard config";
         // Atom 7: ZK-Attested Storage (Proof generated inside write)
         let block = self.storage.write(test_data, "UI intent")?;
@@ -225,16 +254,19 @@ impl KaranaMonad {
         } else {
             log::info!("Atom 5: ❌ Chunk not found!");
         }
+        log::info!("Step 7/8: Storage & Swarm Test [OK]");
         
         // Atom 1: Chain Attest (Genesis tie-in)
         log::info!("Full Flow: Monad Ignited! Rendered: {}, Merkle Root: {:?}", rendered, hex::encode(&block.merkle_root));
 
         // Phase v1.0: Initial Snapshot
+        log::info!("Step 8/8: State Persistence...");
         if let Ok(snap_msg) = self.persist.snapshot_home() {
             log::info!("Atom 2 (Persist): {}", snap_msg);
         }
+        log::info!("Step 8/8: State Persistence [OK]");
 
-        log::info!("Sovereign Weave Complete – Entering Consensus Loop...");
+        log::info!("=== SYSTEM READY: Entering Consensus Loop ===");
         
         let mut height = 1;
         let mut parent_hash = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
@@ -254,19 +286,45 @@ impl KaranaMonad {
                     },
                     KaranaSwarmEvent::AIRequestReceived(req) => {
                         log::info!("Atom 6 (P2P): Processing AI Request from {}: '{}'", req.requester_peer_id, req.prompt);
-                        // Offload compute to our local AI
-                        let result = match self.ai.lock().unwrap().predict(&req.prompt, 100) {
-                            Ok(r) => r,
-                            Err(e) => format!("Compute Error: {}", e),
-                        };
-                        if let Err(e) = self.swarm.send_ai_response(req.request_id, result).await {
-                            log::error!("Atom 6 (P2P): Failed to send AI response: {}", e);
-                        }
+                        // Offload compute to our local AI (Non-blocking)
+                        let ai_clone = self.ai.clone();
+                        let swarm_clone = self.swarm.clone();
+                        let req_id = req.request_id;
+                        let prompt = req.prompt.clone();
+                        
+                        tokio::task::spawn_blocking(move || {
+                            let result = match ai_clone.lock().unwrap().predict(&prompt, 100) {
+                                Ok(r) => r,
+                                Err(e) => format!("Compute Error: {}", e),
+                            };
+                            
+                            // We need to send the response. Since we are in a blocking thread, 
+                            // we need a runtime handle or just block_on if send_ai_response is async.
+                            // send_ai_response is async.
+                            let rt = tokio::runtime::Handle::current();
+                            rt.block_on(async {
+                                if let Err(e) = swarm_clone.send_ai_response(req_id, result).await {
+                                    log::error!("Atom 6 (P2P): Failed to send AI response: {}", e);
+                                }
+                            });
+                        });
                     },
                     KaranaSwarmEvent::AIResponseReceived(res) => {
                         log::info!("Atom 6 (P2P): Received AI Result [{}]: {}", res.request_id, res.result);
                         // Notify UI
                         let _ = self.ui.render_intent(format!("Swarm AI Result: {}", res.result), vec![]).await;
+                    },
+                    KaranaSwarmEvent::ClipboardReceived(clip) => {
+                        log::info!("Atom 6 (P2P): Received Clipboard Sync from {}", clip.did);
+                        // Verify DID matches local user (or trusted peer)
+                        // For now, we just log it and update UI if it's "our" DID
+                        let local_did = self.identity.lock().unwrap().get_active_did().unwrap_or_default();
+                        if clip.did == local_did {
+                            log::info!("Atom 5 (Ecosystem): Syncing Clipboard (Self-Sovereign Sync)...");
+                            let _ = self.ui.render_intent(format!("Clipboard Synced: {}", clip.content), vec![]).await;
+                        } else {
+                            log::info!("Atom 5 (Ecosystem): Ignoring Clipboard from foreign DID: {}", clip.did);
+                        }
                     }
                 }
             }

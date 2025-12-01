@@ -16,3 +16,4 @@ pub mod installer;
 pub mod pkg;
 pub mod state;
 pub mod hardware;
+pub mod identity;

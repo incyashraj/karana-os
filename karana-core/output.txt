@@ -1,0 +1,31 @@
+warning: unused variable: `path_sum`
+   --> src/boot.rs:103:13
+    |
+103 |         let path_sum: u64 = path_bytes.iter().map(|&b| b as u64).sum();
+    |             ^^^^^^^^
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+help: if this is intentional, prefix it with an underscore
+    |
+103 |         let _path_sum: u64 = path_bytes.iter().map(|&b| b as u64).sum();
+    |             +
+help: you might have meant to pattern match on the similarly named constant `HASH_R`
+    |
+103 -         let path_sum: u64 = path_bytes.iter().map(|&b| b as u64).sum();
+103 +         let identity::HASH_R: u64 = path_bytes.iter().map(|&b| b as u64).sum();
+    |
+
+warning: `karana-core` (lib) generated 1 warning (run `cargo fix --lib -p karana-core` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.05s
+     Running `target/debug/karana-core`
+DEBUG: Generating Constraints. Path Sum (Witness): 32
+DEBUG: Generating Constraints. Hash (Public Input): 32
+DEBUG: CS Satisfied? Err(AssignmentMissing)
+[?1049h[?1000h[?1002h[?1003h[?1015h[?1006h[1;1H┌───────────────────────────────────────────────────────────────────────────────────────────────┐[2;1H│[2;97H│[3;1H│[3;97H│[4;1H│[4;97H│[5;1H│[5;97H│[6;1H│[6;97H│[7;1H│[7;97H│[8;1H│[8;97H│[9;1H│[9;97H│[10;1H│[10;97H│[11;1H│[11;97H│[12;1H│[12;34H_[12;37H__[12;42H_[12;46H___[12;52H_[12;56H_[12;59H_[12;63H_[12;97H│[13;1H│[13;33H|[13;35H|/[13;38H/[13;41H/_\[13;45H|[13;47H_[13;49H\[13;51H/_\[13;55H|[13;57H\|[13;60H|[13;62H/_\[13;97H│[14;1H│[14;33H|[14;35H'[14;37H<[14;40H/[14;42H_[14;44H\|[14;49H//[14;52H_[14;54H\|[14;57H.`[14;60H|/[14;63H_[14;65H\[14;97H│[15;1H│[15;33H|_|\_\/_/[15;43H\_\_|_/_/[15;53H\_\_|\_/_/[15;64H\_\[15;97H│[16;1H│[16;97H│[17;1H│[17;38HThe[17;42HSovereign[17;52HAI-Native[17;62HOS[17;97H│[18;1H│[18;35HBooting[18;43HSovereign[18;53HMonad...[18;62H0%[18;97H│[19;1H│[19;97H│[20;1H│[20;97H│[21;1H│[21;97H│[22;1H│[22;97H│[23;1H│[23;97H│[24;1H│[24;97H│[25;1H│[25;97H│[26;1H│[26;97H│[27;1H│[27;97H│[28;1H└───────────────────────────────────────────────────────────────────────────────────────────────┘[39m[49m[59m[0m[?25l[18;62H1[39m[49m[59m[0m[?25l[18;62H2[39m[49m[59m[0m[?25l[18;62H3[19;49H█[39m[49m[59m[0m[?25l[18;62H4[39m[49m[59m[0m[?25l[18;62H5[39m[49m[59m[0m[?25l[18;62H6[19;48H█[39m[49m[59m[0m[?25l[18;62H7[39m[49m[59m[0m[?25lDEBUG: Generating Constraints. Path Sum (Witness): 32
+DEBUG: Generating Constraints. Hash (Public Input): 32
+DEBUG: CS Satisfied? Ok(true)
+[18;62H8[19;50H█[39m[49m[59m[0m[?25l[18;62H9[39m[49m[59m[0m[?25l[18;34HBo[18;37Hting Sovereign Monad.[18;60H 10[39m[49m[59m[0m[?25l[18;62H1[19;47H█[39m[49m[59m[0m[?25l[18;62H2[39m[49m[59m[0m[?25l[18;62H3[19;51H█[39m[49m[59m[0m[?25l[18;62H4[39m[49m[59m[0m[?25l[18;62H5[39m[49m[59m[0m[?25l[18;62H6[19;46H█[39m[49m[59m[0m[?25l[18;62H7[39m[49m[59m[0m[?25l[18;62H9[19;52H█[39m[49m[59m[0m[?25l[18;61H20[39m[49m[59m[0m[?25l[18;62H1[39m[49m[59m[0m[?25l[18;62H2[19;45H█[39m[49m[59m[0m[?25l[18;62H3[39m[49m[59m[0m[?25l[18;62H4[19;53H█[39m[49m[59m[0m[?25l[18;62H5[39m[49m[59m[0m[?25lConstraint trace requires enabling `ConstraintLayer`
+
+thread 'main' (289737) panicked at /home/me/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/ark-groth16-0.5.0/src/prover.rs:193:9:
+assertion failed: cs.is_satisfied().unwrap()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

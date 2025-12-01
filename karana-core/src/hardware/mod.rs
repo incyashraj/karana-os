@@ -123,4 +123,23 @@ impl KaranaHardware {
         let mut pm = self.power.lock().unwrap();
         format!("{} | Sensors: {:?}", pm.update(), self.caps.sensors)
     }
+
+    pub fn start_simulation(&self) {
+        log::info!("Atom 3 (Hardware): Starting Hardware Simulation Mode...");
+        let input = self.input.clone();
+        
+        std::thread::spawn(move || {
+            loop {
+                // Simulate Gaze Movement
+                {
+                    let mut inp = input.lock().unwrap();
+                    inp.simulate_random_gaze();
+                }
+                
+                // Simulate occasional sensor events or voice triggers could go here
+                
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        });
+    }
 }

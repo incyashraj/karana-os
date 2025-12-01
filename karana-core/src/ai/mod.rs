@@ -353,14 +353,22 @@ impl KaranaAI {
             let mut logits_processor = LogitsProcessor::new(299792458, Some(0.7), Some(0.9)); // Seed, Temp, TopP
 
             let mut output_text = String::new();
+            let mut index_pos = 0;
             
-            for _ in 0..max_tokens {
-                let input = Tensor::new(all_tokens.as_slice(), &self.device)?.unsqueeze(0)?;
-                let logits = model.forward(&input, 0)?; 
+            for index in 0..max_tokens {
+                let (context_size, start_pos) = if index == 0 {
+                    (all_tokens.len(), 0)
+                } else {
+                    (1, all_tokens.len() - 1)
+                };
+
+                let input = Tensor::new(&all_tokens[start_pos..], &self.device)?.unsqueeze(0)?;
+                let logits = model.forward(&input, index_pos)?; 
                 let logits = logits.squeeze(0)?;
                 let next_token_logits = logits.get(logits.dim(0)? - 1)?;
                 let next_token = logits_processor.sample(&next_token_logits)?;
                 
+                index_pos += context_size;
                 all_tokens.push(next_token);
                 
                 if let Some(t) = tokenizer.decode(&[next_token], true).ok() {

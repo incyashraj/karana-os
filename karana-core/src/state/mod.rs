@@ -38,11 +38,12 @@ impl KaranaPersist {
         // 2. Hash the Snapshot (Simulated)
         // In reality, we'd read the block groups or a Merkle tree of the subvol.
         let mock_data = format!("Snapshot content {}", timestamp);
-        let vol_hash = Sha256::digest(mock_data.as_bytes());
+        // Use the circuit-compatible hash (XOR sum) instead of Sha256 for the demo proof
+        let vol_hash = crate::zk::compute_hash(mock_data.as_bytes());
         
         // 3. Generate ZK Proof of State
         // Proving we know the content that matches this hash
-        let proof = prove_data_hash(mock_data.as_bytes(), vol_hash.into())?;
+        let proof = prove_data_hash(mock_data.as_bytes(), vol_hash)?;
         
         // 4. Return Proof/Hash for Chain
         Ok(format!("Snapshot 0x{}... Created. Proof Size: {} bytes", hex::encode(&vol_hash[0..4]), proof.len()))

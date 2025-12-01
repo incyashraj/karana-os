@@ -2,6 +2,7 @@ pub mod gui;
 pub mod input;
 pub mod render_proof;
 pub mod theme;
+pub mod compositor;
 
 use actix::prelude::*;
 use crate::runtime::KaranaActor;
@@ -10,6 +11,8 @@ use crate::ai::KaranaAI;
 use crate::gov::KaranaDAO;
 use crate::market::KaranaBazaar;
 use crate::pkg::AppBundle;
+use crate::identity::KaranaIdentity;
+use crate::ui::compositor::ARCompositor;
 use std::sync::{Arc, Mutex, mpsc};
 use std::process::Command;
 use std::fs;
@@ -47,6 +50,7 @@ pub struct UiState {
     pub gaze_status: String,
     pub ar_context: Option<String>,
     pub ar_suggestions: Vec<String>,
+    pub active_did: String,
 }
 
 pub struct KaranaUI {
@@ -60,16 +64,19 @@ pub struct KaranaUI {
     state: Arc<Mutex<UiState>>,
     intent_rx: Mutex<mpsc::Receiver<String>>,
     hardware: Arc<crate::hardware::KaranaHardware>,
+    identity: Arc<Mutex<KaranaIdentity>>,
+    compositor: Arc<ARCompositor>,
 }
 
 impl KaranaUI {
-    pub fn new(runtime: &Arc<KaranaActor>, swarm: &KaranaSwarm, ai: Arc<Mutex<KaranaAI>>, hardware: Arc<crate::hardware::KaranaHardware>) -> anyhow::Result<Self> {
+    pub fn new(runtime: &Arc<KaranaActor>, swarm: &KaranaSwarm, ai: Arc<Mutex<KaranaAI>>, hardware: Arc<crate::hardware::KaranaHardware>, identity: Arc<Mutex<KaranaIdentity>>) -> anyhow::Result<Self> {
         let mut dao = KaranaDAO::default();
         // Test mint for user
         dao.token.mint("user", U256::from(200u64));
 
         let market = Arc::new(Mutex::new(KaranaBazaar::new(ai.clone())));
         let bundle = AppBundle::new();
+        let compositor = Arc::new(ARCompositor::new());
 
         let state = Arc::new(Mutex::new(UiState {
             balance: 200,
@@ -83,6 +90,7 @@ impl KaranaUI {
             gaze_status: "Gaze: --".to_string(),
             ar_context: None,
             ar_suggestions: vec![],
+            active_did: "Guest".to_string(),
         }));
 
         let (tx, rx) = mpsc::channel();
@@ -90,11 +98,17 @@ impl KaranaUI {
         // Spawn TUI thread
         let state_clone = state.clone();
         let hw_clone = hardware.clone();
-        std::thread::spawn(move || {
-            if let Err(e) = run_tui(state_clone, tx, hw_clone) {
-                log::error!("TUI Error: {}", e);
-            }
-        });
+        let comp_clone = compositor.clone();
+        
+        if std::env::var("NO_TUI").is_err() {
+            std::thread::spawn(move || {
+                if let Err(e) = run_tui(state_clone, tx, hw_clone, comp_clone) {
+                    log::error!("TUI Error: {}", e);
+                }
+            });
+        } else {
+            log::info!("TUI Disabled by NO_TUI env var");
+        }
 
         Ok(Self {
             swarm: swarm.clone(),
@@ -106,6 +120,8 @@ impl KaranaUI {
             state,
             intent_rx: Mutex::new(rx),
             hardware,
+            identity,
+            compositor,
         })
     }
 
@@ -276,6 +292,48 @@ impl KaranaUI {
             let prompt = input.replace("offload", "").trim().to_string();
             let req_id = self.swarm.send_ai_request(prompt.clone()).await?;
             format!("Offloaded AI Task '{}' to Swarm. Request ID: {}", prompt, req_id)
+        } else if input.starts_with("create did") {
+            // create did <pubkey>
+            let parts: Vec<&str> = input.split_whitespace().collect();
+            if parts.len() < 3 {
+                return Ok("Usage: create did <pubkey>".to_string());
+            }
+            let pubkey = parts[2];
+            // Simulate biometric scan (random bytes for demo)
+            let bio_sample = vec![1, 2, 3, 4, 5]; 
+            
+            let mut id_lock = self.identity.lock().unwrap();
+            let did = id_lock.create_did(pubkey, &bio_sample)?;
+            
+            if let Ok(mut s) = self.state.lock() {
+                s.active_did = did.id.clone();
+            }
+            format!("Identity Created: {}\nCommitment: {}", did.id, did.biometric_commitment)
+        } else if input.starts_with("login") {
+            // login (simulates biometric scan)
+            let bio_sample = vec![1, 2, 3, 4, 5]; // Must match create did for demo
+            
+            let id_lock = self.identity.lock().unwrap();
+            match id_lock.authenticate(&bio_sample) {
+                Ok(proof) => {
+                    let did_str = id_lock.get_active_did().unwrap_or("Unknown".to_string());
+                    format!("Login Successful! ZK-Proof generated ({} bytes).\nActive DID: {}", proof.len(), did_str)
+                },
+                Err(e) => format!("Login Failed: {}", e),
+            }
+        } else if input.starts_with("copy") {
+            let content = input.replace("copy", "").trim().to_string();
+            let did = self.identity.lock().unwrap().get_active_did().unwrap_or("Guest".to_string());
+            
+            if did == "Guest" {
+                return Ok("Error: Must login to sync clipboard.".to_string());
+            }
+            
+            // Sign content (Simulated signature for now)
+            let signature = vec![1, 2, 3, 4]; 
+            
+            self.swarm.broadcast_clipboard(content.clone(), did.clone(), signature).await?;
+            format!("Copied to Universal Clipboard (Synced to Swarm as {})", did)
         } else if input.starts_with("install") || input.starts_with("download") || input.starts_with("get") {
             let app_id = input.replace("install", "")
                               .replace("download", "")
@@ -387,6 +445,9 @@ impl KaranaUI {
                 "Adaptive View"
             };
             
+            // Update Compositor with AI suggestion
+            self.compositor.add_widget("ai_main", &view_desc, 0.1, 0.2);
+            
             format!("AI Generated View [{}]: {}", view_type, view_desc.trim())
         };
 
@@ -430,7 +491,7 @@ fn verify_zk_proof(_proof: &[u8], _data: &[u8]) -> bool {
     true
 }
 
-fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware: Arc<crate::hardware::KaranaHardware>) -> Result<(), io::Error> {
+fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware: Arc<crate::hardware::KaranaHardware>, compositor: Arc<ARCompositor>) -> Result<(), io::Error> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -549,15 +610,22 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 )
                 .split(f.area());
 
-            let (balance, height, view, intent, active_app, app_output, power, gaze, ar_ctx, ar_sug) = {
+            let (balance, height, view, intent, active_app, app_output, power, gaze, ar_ctx, ar_sug, did) = {
                 let s = state.lock().unwrap();
-                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone(), s.ar_context.clone(), s.ar_suggestions.clone())
+                (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone(), s.ar_context.clone(), s.ar_suggestions.clone(), s.active_did.clone())
             };
+
+            // Update Compositor HUD
+            compositor.update_hud(
+                &format!("H: #{}", height),
+                &power,
+                &format!("User: {}", did)
+            );
 
             // 1. Header
             let header_text = format!(
-                "Kāraṇa OS v0.2 (Glass) | Balance: {} KARA | Height: #{} | {} | {}",
-                balance, height, power, gaze
+                "Kāraṇa OS v0.2 (Glass) | User: {} | Balance: {} KARA | Height: #{} | {} | {}",
+                did, balance, height, power, gaze
             );
             let header = Paragraph::new(header_text)
                 .block(Block::default().borders(Borders::ALL));
@@ -581,7 +649,17 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 hud.push_str("\n(Type suggestion to execute)");
                 hud
             } else {
-                view
+                // Use Compositor to render the view if it's not a raw string
+                if view.starts_with("AI Generated") {
+                    // Add widget to compositor for visualization
+                    compositor.add_widget("ai_view", &view, 0.1, 0.3);
+                    // Render frame
+                    let width = chunks[1].width as usize;
+                    let height = chunks[1].height as usize;
+                    compositor.render(width, height).unwrap_or(view)
+                } else {
+                    view
+                }
             };
 
             let output = Paragraph::new(content)

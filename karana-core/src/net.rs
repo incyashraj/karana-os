@@ -29,6 +29,14 @@ pub struct AIComputeResponse {
     pub result: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClipboardSync {
+    pub content: String,
+    pub did: String,
+    pub signature: Vec<u8>, // Proof of ownership
+    pub timestamp: u64,
+}
+
 #[derive(NetworkBehaviour)]
 struct KaranaBehaviour {
     gossipsub: gossipsub::Behaviour,
@@ -41,6 +49,7 @@ enum SwarmCmd {
     ZkDial { peer: Multiaddr, #[allow(dead_code)] proof: Vec<u8> },
     SendAIRequest(AIComputeRequest),
     SendAIResponse(AIComputeResponse),
+    SyncClipboard(ClipboardSync),
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +58,7 @@ pub enum KaranaSwarmEvent {
     GenericMessage(String),
     AIRequestReceived(AIComputeRequest),
     AIResponseReceived(AIComputeResponse),
+    ClipboardReceived(ClipboardSync),
 }
 
 #[derive(Clone)]
@@ -150,6 +160,9 @@ impl KaranaSwarm {
                             } else if let Ok(res) = serde_json::from_slice::<AIComputeResponse>(&message.data) {
                                 log::info!("Atom 6 (P2P): Received AI Compute Response: {}", res.request_id);
                                 let _ = event_tx.send(KaranaSwarmEvent::AIResponseReceived(res)).await;
+                            } else if let Ok(clip) = serde_json::from_slice::<ClipboardSync>(&message.data) {
+                                log::info!("Atom 6 (P2P): Received Clipboard Sync from {}", clip.did);
+                                let _ = event_tx.send(KaranaSwarmEvent::ClipboardReceived(clip)).await;
                             } else {
                                 let _ = event_tx.send(KaranaSwarmEvent::GenericMessage(String::from_utf8_lossy(&message.data).to_string())).await;
                             }
@@ -165,6 +178,14 @@ impl KaranaSwarm {
                                 let topic = gossipsub::IdentTopic::new("karana-blocks");
                                 if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
                                     log::info!("Atom 6 (P2P): Publish error: {:?}", e);
+                                }
+                            },
+                            SwarmCmd::SyncClipboard(clip) => {
+                                let topic = gossipsub::IdentTopic::new("karana-blocks");
+                                if let Ok(data) = serde_json::to_vec(&clip) {
+                                    if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
+                                        log::info!("Atom 6 (P2P): Clipboard Sync error: {:?}", e);
+                                    }
                                 }
                             },
                             SwarmCmd::SendAIRequest(req) => {
@@ -281,6 +302,17 @@ impl KaranaSwarm {
             result,
         };
         self.cmd_tx.send(SwarmCmd::SendAIResponse(res)).await?;
+        Ok(())
+    }
+
+    pub async fn broadcast_clipboard(&self, content: String, did: String, signature: Vec<u8>) -> Result<()> {
+        let clip = ClipboardSync {
+            content,
+            did,
+            signature,
+            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+        };
+        self.cmd_tx.send(SwarmCmd::SyncClipboard(clip)).await?;
         Ok(())
     }
 }
