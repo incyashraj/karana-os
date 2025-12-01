@@ -16,7 +16,7 @@ use std::fs;
 use alloy_primitives::U256;
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Alignment},
     widgets::{Block, Borders, Paragraph, Wrap},
     Terminal,
 };
@@ -361,6 +361,75 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>) -> Resul
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    // Boot Animation
+    let logo = vec![
+        "  _  __   _   ___   _   _  _   _   ",
+        " | |/ /  /_\ | _ \ /_\ | \| | /_\  ",
+        " | ' <  / _ \|   // _ \| .` |/ _ \ ",
+        " |_|\_\/_/ \_\_|_/_/ \_\_|\_/_/ \_\",
+        "                                   ",
+        "      The Sovereign AI-Native OS   "
+    ];
+
+    let start = std::time::Instant::now();
+    let duration = std::time::Duration::from_secs(3);
+    
+    while start.elapsed() < duration {
+        terminal.draw(|f| {
+             let size = f.area();
+             let block = Block::default().borders(Borders::ALL);
+             f.render_widget(block, size);
+             
+             // Center the logo
+             let v_center = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Percentage(40),
+                    Constraint::Length(logo.len() as u16),
+                    Constraint::Percentage(40),
+                ].as_ref())
+                .split(size);
+                
+             let h_center = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(80),
+                    Constraint::Percentage(10),
+                ].as_ref())
+                .split(v_center[1]);
+                
+             let logo_text = logo.join("\n");
+             let p = Paragraph::new(logo_text)
+                .alignment(Alignment::Center);
+             f.render_widget(p, h_center[1]);
+             
+             // Loading bar
+             let loading_area = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                ].as_ref())
+                .split(v_center[2]);
+                
+             let elapsed = start.elapsed().as_millis() as f64;
+             let total = duration.as_millis() as f64;
+             let progress = (elapsed / total).min(1.0);
+             
+             let bar_width = (size.width as f64 * 0.4 * progress) as usize;
+             let bar = "█".repeat(bar_width);
+             let bar_p = Paragraph::new(bar).alignment(Alignment::Center);
+             
+             let loading_text = Paragraph::new(format!("Booting Sovereign Monad... {:.0}%", progress * 100.0))
+                .alignment(Alignment::Center);
+                
+             f.render_widget(loading_text, loading_area[0]);
+             f.render_widget(bar_p, loading_area[1]);
+        })?;
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
 
     let mut input_buffer = String::new();
 
