@@ -221,6 +221,25 @@ impl KaranaUI {
                 ai_locked.download_model()
             }).await??;
             res
+        } else if input.starts_with("transcribe") {
+            let path_str = input.replace("transcribe", "").trim().to_string();
+            let ai = self.ai_render.clone();
+            
+            // Spawn blocking task for heavy audio processing
+            let res = tokio::task::spawn_blocking(move || -> anyhow::Result<String> {
+                // 1. Read Audio (Real Functionality)
+                let samples = crate::hardware::input::MultimodalInput::read_audio_file(&path_str)
+                    .map_err(|e| anyhow::anyhow!("Audio Read Error: {}", e))?;
+                
+                // 2. Transcribe (Real Functionality)
+                let mut ai_locked = ai.lock().unwrap();
+                let text = ai_locked.transcribe(samples)
+                    .map_err(|e| anyhow::anyhow!("Whisper Error: {}", e))?;
+                    
+                Ok(format!("Transcription [{}]:\n\"{}\"", path_str, text))
+            }).await??;
+            
+            res
         } else if input.starts_with("install") || input.starts_with("download") || input.starts_with("get") {
             let app_id = input.replace("install", "")
                               .replace("download", "")

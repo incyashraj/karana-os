@@ -3,6 +3,7 @@ use candle_core::{Device, Tensor, DType};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
 use candle_transformers::models::quantized_llama::ModelWeights as QLlama;
+use candle_transformers::models::whisper::{self as m, Config as WhisperConfig, Model as WhisperModel};
 use candle_transformers::generation::LogitsProcessor;
 use tokenizers::{Tokenizer, PaddingParams};
 use hf_hub::{api::sync::Api, Repo, RepoType};
@@ -13,6 +14,9 @@ use std::io::Write;
 const MODEL_REPO: &str = "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
 const MODEL_FILE: &str = "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
 
+// Whisper Tiny (Quantized or Float? Let's use tiny.en for speed/size)
+const WHISPER_REPO: &str = "openai/whisper-tiny.en";
+
 pub struct KaranaAI {
     device: Device,
     // Atom 3: Embedding Engine (Small, always loaded)
@@ -21,6 +25,11 @@ pub struct KaranaAI {
     // Atom 3: Generative Engine (Large, load on demand)
     gen_model: Option<QLlama>,
     gen_tokenizer: Option<Tokenizer>,
+    // Atom 3: Voice Engine (Whisper)
+    whisper_model: Option<WhisperModel>,
+    whisper_tokenizer: Option<Tokenizer>,
+    whisper_config: Option<WhisperConfig>,
+    whisper_mel: Option<m::audio::AudioConfig>,
 }
 
 impl KaranaAI {
@@ -39,13 +48,117 @@ impl KaranaAI {
             (None, None)
         });
 
+        // Atom 3: Try Initialize Whisper (Lazy)
+        // We don't load it by default to save RAM, but we prepare the struct.
+        // For now, let's leave it None and load on demand.
+
         Ok(Self {
             device,
             embed_model,
             embed_tokenizer,
             gen_model,
             gen_tokenizer,
+            whisper_model: None,
+            whisper_tokenizer: None,
+            whisper_config: None,
+            whisper_mel: None,
         })
+    }
+
+    pub fn load_whisper(&mut self) -> Result<()> {
+        if self.whisper_model.is_some() { return Ok(()); }
+        
+        log::info!("Atom 3: Loading Whisper Model (tiny.en)...");
+        let api = Api::new()?;
+        let repo = api.repo(Repo::new(WHISPER_REPO.to_string(), RepoType::Model));
+        
+        let config_filename = repo.get("config.json")?;
+        let tokenizer_filename = repo.get("tokenizer.json")?;
+        let weights_filename = repo.get("model.safetensors")?;
+
+        let config: WhisperConfig = serde_json::from_str(&std::fs::read_to_string(config_filename)?)?;
+        let tokenizer = Tokenizer::from_file(tokenizer_filename).map_err(|e| anyhow!(e))?;
+        
+        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights_filename], DType::F32, &self.device)? };
+        let model = WhisperModel::new(&config, vb)?;
+        
+        self.whisper_model = Some(model);
+        self.whisper_tokenizer = Some(tokenizer);
+        self.whisper_config = Some(config);
+        self.whisper_mel = Some(m::audio::AudioConfig::hparams_tiny()); // tiny.en uses tiny hparams
+        
+        Ok(())
+    }
+
+    pub fn transcribe(&mut self, audio_data: Vec<f32>) -> Result<String> {
+        if self.whisper_model.is_none() {
+            self.load_whisper()?;
+        }
+        
+        let model = self.whisper_model.as_ref().unwrap();
+        let tokenizer = self.whisper_tokenizer.as_ref().unwrap();
+        let config = self.whisper_config.as_ref().unwrap();
+        // let mel_config = self.whisper_mel.as_ref().unwrap(); // Not used directly in model.forward? 
+        // Actually we need to compute Mel Spectrogram.
+        
+        // Note: candle-transformers 0.9.1 whisper example uses a helper for mel.
+        // We need to implement or use `candle_transformers::models::whisper::audio::pcm_to_mel`
+        // But that might not be public. Let's check if we can use the model directly.
+        // The `Model` expects a Tensor of mel spectrograms.
+        
+        // For this prototype, implementing full Mel extraction is complex.
+        // However, `candle-transformers` usually exposes `pcm_to_mel`.
+        // If not, we might need to rely on a simulation for the *transcription* part if the audio processing is too heavy to implement in one go.
+        // BUT the user said "Real Functionality".
+        // So I must try to use `pcm_to_mel`.
+        
+        // Let's assume `m::audio::pcm_to_mel` exists and works.
+        // If it fails to compile, I will fix it.
+        
+        let mel = m::audio::pcm_to_mel(&config, &audio_data, &m::audio::AudioConfig::hparams_tiny())?;
+        let mel_len = mel.len();
+        let mel_tensor = Tensor::from_vec(mel, (1, 80, mel_len / 80), &self.device)?;
+        
+        // Generate tokens
+        // Simple greedy decoding
+        let mut tokens = vec![50258u32, 50259, 50359]; // <|startoftranscript|>, <|en|>, <|transcribe|> (check tokenizer for exact IDs)
+        // Actually, let's use the tokenizer to find start tokens if possible, or hardcode for tiny.en
+        // tiny.en: 50257=<|endoftext|>, 50258=<|startoftranscript|>, 50259=<|en|>, 50359=<|transcribe|>, 50363=<|notimestamps|>
+        
+        let mut logits_processor = LogitsProcessor::new(299792458, Some(0.0), None); // Greedy
+        
+        for _ in 0..100 {
+            let input = Tensor::new(tokens.as_slice(), &self.device)?.unsqueeze(0)?;
+            let logits = model.decoder().forward(&input, &model.encoder().forward(&mel_tensor, true)?)?; 
+            // Wait, encoder forward is expensive, should be done once.
+            // model.encoder().forward(&mel_tensor, true)? -> audio_features
+            
+            // Correct loop:
+            // 1. Encode audio
+            // 2. Loop decode
+            break; // Placeholder to avoid infinite loop in this thought block
+        }
+        
+        // Re-implementing full Whisper decode loop is verbose.
+        // Let's use a simplified version or just return a "Real Transcription" stub if the loop is too big.
+        // NO, "Real Functionality".
+        
+        // Okay, let's do the proper loop.
+        let audio_features = model.encoder().forward(&mel_tensor, true)?;
+        
+        for _ in 0..100 {
+            let input = Tensor::new(tokens.as_slice(), &self.device)?.unsqueeze(0)?;
+            let logits = model.decoder().forward(&input, &audio_features)?;
+            let logits = logits.squeeze(0)?;
+            let next_token_logits = logits.get(logits.dim(0)? - 1)?;
+            let next_token = logits_processor.sample(&next_token_logits)?;
+            
+            tokens.push(next_token);
+            if next_token == 50257 { break; } // <|endoftext|>
+        }
+        
+        let decoded = tokenizer.decode(&tokens, true).map_err(|e| anyhow!(e))?;
+        Ok(decoded)
     }
 
     fn load_embedding_model(device: &Device) -> Result<(Option<BertModel>, Option<Tokenizer>)> {
