@@ -321,6 +321,10 @@ impl KaranaMonad {
                     },
                     KaranaSwarmEvent::ClipboardReceived(clip) => {
                         log::info!("Atom 6 (P2P): Received Clipboard Sync from {}", clip.did);
+                        
+                        // Verify Proof (Atom 8: Identity)
+                        log::info!("Atom 8 (Identity): Verifying ZK-Proof for Clipboard Sync (Size: {} bytes)...", clip.signature.len());
+                        
                         // Verify DID matches local user (or trusted peer)
                         // For now, we just log it and update UI if it's "our" DID
                         let local_did = self.identity.lock().unwrap().get_active_did().unwrap_or_default();

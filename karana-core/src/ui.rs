@@ -338,16 +338,22 @@ impl KaranaUI {
             }
         } else if input.starts_with("copy") {
             let content = input.replace("copy", "").trim().to_string();
-            let did = self.identity.lock().unwrap().get_active_did().unwrap_or("Guest".to_string());
             
-            if did == "Guest" {
-                return Ok("Error: Must login to sync clipboard.".to_string());
-            }
+            // Authenticate (Simulated Biometrics)
+            let bio_sample = vec![1, 2, 3, 4, 5]; 
+            let (did, proof) = {
+                let id_lock = self.identity.lock().unwrap();
+                if let Some(did_str) = id_lock.get_active_did() {
+                    match id_lock.authenticate(&bio_sample) {
+                        Ok(p) => (did_str, p),
+                        Err(e) => return Ok(format!("Auth Failed: {}", e)),
+                    }
+                } else {
+                    return Ok("Error: No Active DID. Run 'create did <key>' first.".to_string());
+                }
+            };
             
-            // Sign content (Simulated signature for now)
-            let signature = vec![1, 2, 3, 4]; 
-            
-            self.swarm.broadcast_clipboard(content.clone(), did.clone(), signature).await?;
+            self.swarm.broadcast_clipboard(content.clone(), did.clone(), proof).await?;
             format!("Copied to Universal Clipboard (Synced to Swarm as {})", did)
         } else if input.starts_with("install") || input.starts_with("download") || input.starts_with("get") {
             let app_id = input.replace("install", "")
