@@ -57,25 +57,10 @@ pub struct AsciiRenderer;
 
 impl ARRenderer for AsciiRenderer {
     fn render(&self, scene: &ARScene, width: usize, height: usize) -> Result<String> {
-        // 1. Create empty buffer
+        // 1. Create empty buffer (Transparent/Space)
         let mut buffer = vec![vec![' '; width]; height];
 
-        // 2. Draw Border (Glass Frame)
-        // Top/Bottom
-        for x in 0..width {
-            buffer[0][x] = '═';
-            buffer[height - 1][x] = '═';
-        }
-        // Sides
-        for y in 0..height {
-            buffer[y][0] = '║';
-            buffer[y][width - 1] = '║';
-        }
-        // Corners
-        buffer[0][0] = '╔';
-        buffer[0][width - 1] = '╗';
-        buffer[height - 1][0] = '╚';
-        buffer[height - 1][width - 1] = '╝';
+        // 2. No Outer Border - The screen is the world
 
         // 3. Render Nodes
         for node in scene.get_all_nodes() {
@@ -86,41 +71,52 @@ impl ARRenderer for AsciiRenderer {
             let screen_h = (node.height * height as f32).max(3.0) as usize;
 
             // Clamp to bounds
-            let end_x = (screen_x + screen_w).min(width - 2);
-            let end_y = (screen_y + screen_h).min(height - 2);
-            let start_x = screen_x.max(1);
-            let start_y = screen_y.max(1);
+            let end_x = (screen_x + screen_w).min(width - 1);
+            let end_y = (screen_y + screen_h).min(height - 1);
+            let start_x = screen_x;
+            let start_y = screen_y;
 
             if start_x >= end_x || start_y >= end_y { continue; }
 
-            // Draw Box with Border
-            for y in start_y..=end_y {
-                for x in start_x..=end_x {
-                    let ch = if y == start_y && x == start_x { '┌' }
-                    else if y == start_y && x == end_x { '┐' }
-                    else if y == end_y && x == start_x { '└' }
-                    else if y == end_y && x == end_x { '┘' }
-                    else if y == start_y || y == end_y { '─' }
-                    else if x == start_x || x == end_x { '│' }
-                    else { ' ' }; // Clear content inside
-                    
-                    buffer[y][x] = ch;
-                }
-            }
+            // Draw HUD Style "Corners"
+            // Top Left
+            if start_y < height && start_x < width { buffer[start_y][start_x] = '╭'; }
+            if start_y < height && start_x + 1 < width { buffer[start_y][start_x + 1] = '─'; }
+            if start_y + 1 < height && start_x < width { buffer[start_y + 1][start_x] = '│'; }
+
+            // Top Right
+            if start_y < height && end_x < width { buffer[start_y][end_x] = '╮'; }
+            if start_y < height && end_x > 0 { buffer[start_y][end_x - 1] = '─'; }
+            if start_y + 1 < height && end_x < width { buffer[start_y + 1][end_x] = '│'; }
+
+            // Bottom Left
+            if end_y < height && start_x < width { buffer[end_y][start_x] = '╰'; }
+            if end_y < height && start_x + 1 < width { buffer[end_y][start_x + 1] = '─'; }
+            if end_y > 0 && start_x < width { buffer[end_y - 1][start_x] = '│'; }
+
+            // Bottom Right
+            if end_y < height && end_x < width { buffer[end_y][end_x] = '╯'; }
+            if end_y < height && end_x > 0 { buffer[end_y][end_x - 1] = '─'; }
+            if end_y > 0 && end_x < width { buffer[end_y - 1][end_x] = '│'; }
 
             // Draw Content (Wrapped)
             let _content_width = end_x - start_x - 1;
             let content_chars: Vec<char> = node.content.chars().collect();
             
-            let mut cx = start_x + 1;
+            let mut cx = start_x + 2; // Padding
             let mut cy = start_y + 1;
 
             for char in content_chars {
+                if char == '\n' {
+                    cy += 1;
+                    cx = start_x + 2;
+                    continue;
+                }
                 if cy < end_y && cx < end_x {
                     buffer[cy][cx] = char;
                     cx += 1;
-                    if cx >= end_x {
-                        cx = start_x + 1;
+                    if cx >= end_x - 1 {
+                        cx = start_x + 2;
                         cy += 1;
                     }
                 }

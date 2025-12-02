@@ -20,7 +20,7 @@ use alloy_primitives::U256;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Alignment},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph},
     Terminal,
 };
 use crossterm::{
@@ -29,7 +29,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use std::io;
-use tui_logger::{TuiLoggerWidget, TuiLoggerLevelOutput};
+use tui_logger::TuiLoggerWidget;
 
 #[derive(Message)]
 #[rtype(result = "String")]
@@ -647,21 +647,9 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
         }
 
         terminal.draw(|f| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(1)
-                .constraints(
-                    [
-                        Constraint::Length(3),      // Header
-                        Constraint::Percentage(60), // Main Workspace (Dashboard/App)
-                        Constraint::Percentage(20), // Logs
-                        Constraint::Length(3),      // Input
-                    ]
-                    .as_ref(),
-                )
-                .split(f.area());
+            let size = f.area();
 
-            let (balance, height, view, intent, active_app, app_output, power, gaze, ar_ctx, ar_sug, did) = {
+            let (_balance, height, view, intent, active_app, app_output, power, _gaze, ar_ctx, ar_sug, did) = {
                 let s = state.lock().unwrap();
                 (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone(), s.ar_context.clone(), s.ar_suggestions.clone(), s.active_did.clone())
             };
@@ -671,7 +659,38 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 input.last_gaze
             };
 
-            // Update Compositor HUD
+            // 1. Prepare Compositor Scene
+            {
+                let mut scene = compositor.scene.lock().unwrap();
+                scene.clear_apps();
+            }
+
+            if let Some(app) = active_app.clone() {
+                // App Mode
+                let title = format!("APP: {}", app);
+                let content = format!("{}\n\n{}\n", title, app_output);
+                compositor.add_widget_sized("app_main", &content, 0.05, 0.15, 0.9, 0.7);
+            } else if let Some(ctx) = ar_ctx {
+                // AR Context Mode
+                let mut hud = format!("--- AR VISUAL CONTEXT ---\nDetected: {}\n\n[AI SUGGESTIONS]\n", ctx);
+                for (i, sug) in ar_sug.iter().enumerate() {
+                    hud.push_str(&format!("{}. {}\n", i+1, sug));
+                }
+                hud.push_str("\n(Type suggestion to execute)");
+                compositor.add_widget_sized("ar_hud", &hud, 0.1, 0.2, 0.8, 0.6);
+            } else {
+                // Dashboard Mode
+                let status_text = format!("Network: Swarm Active\nConsensus: Height #{}\nIdentity: {}", height, did);
+                compositor.add_widget_sized("sys_status", &status_text, 0.05, 0.15, 0.4, 0.2);
+
+                let launcher_text = "1. Terminal\n2. Files\n3. Bazaar\n4. AI Assistant\n5. Governance";
+                compositor.add_widget_sized("launcher", launcher_text, 0.55, 0.15, 0.4, 0.3);
+
+                let activity_text = format!("Last Intent: {}\nContext: {}", intent, view);
+                compositor.add_widget_sized("activity", &activity_text, 0.05, 0.5, 0.9, 0.25);
+            }
+
+            // Update HUD (Top Bar)
             compositor.update_hud(
                 &format!("H: #{}", height),
                 &power,
@@ -679,80 +698,48 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 (gaze_x, gaze_y)
             );
 
-            // 1. Header
-            let header_text = format!(
-                "Kāraṇa OS v0.2 (Glass) | User: {} | Balance: {} KARA | Height: #{} | {} | {}",
-                did, balance, height, power, gaze
-            );
-            let header = Paragraph::new(header_text)
-                .block(Block::default().borders(Borders::ALL));
-            f.render_widget(header, chunks[0]);
+            // 2. Render Compositor (Full Screen Background)
+            let ar_view = compositor.render(size.width as usize, size.height as usize).unwrap_or_default();
+            let p = Paragraph::new(ar_view);
+            f.render_widget(p, size);
 
-            // 2. Main Workspace (Dashboard or App)
-            let title = if let Some(app) = active_app.clone() {
-                format!(" Running: {} (Type 'close' to exit) ", app)
-            } else {
-                " Kāraṇa Dashboard ".to_string()
-            };
+            // 3. Render Input Overlay (Bottom)
+            // We use a small area at the bottom for the "Voice/Text" input line
+            let input_area = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+                .split(size)[1];
+            
+            let input_text = format!("> {}_", input_buffer);
+            let input_p = Paragraph::new(input_text)
+                .style(ratatui::style::Style::default().fg(ratatui::style::Color::Cyan));
+            f.render_widget(input_p, input_area);
 
-            let content = if active_app.is_some() {
-                app_output
-            } else if let Some(ctx) = ar_ctx {
-                // AR HUD Mode
-                let mut hud = format!("--- AR VISUAL CONTEXT ---\nDetected: {}\n\n[AI SUGGESTIONS]\n", ctx);
-                for (i, sug) in ar_sug.iter().enumerate() {
-                    hud.push_str(&format!("{}. {}\n", i+1, sug));
-                }
-                hud.push_str("\n(Type suggestion to execute)");
-                hud
-            } else {
-                // Dashboard View (AR Compositor)
-                {
-                    let mut scene = compositor.scene.lock().unwrap();
-                    scene.clear_apps();
-                }
-
-                let status_text = format!("Network: Swarm Active\nConsensus: Height #{}\nIdentity: {}", height, did);
-                compositor.add_widget_sized("sys_status", &status_text, 0.05, 0.1, 0.4, 0.25);
-
-                let launcher_text = "1. Terminal\n2. Files\n3. Bazaar\n4. AI Assistant\n5. Governance";
-                compositor.add_widget_sized("launcher", launcher_text, 0.5, 0.1, 0.4, 0.3);
-
-                let activity_text = format!("Last Intent: {}\nContext: {}", intent, view);
-                compositor.add_widget_sized("activity", &activity_text, 0.05, 0.5, 0.85, 0.2);
-
-                // Render to fit inside the Paragraph's borders
-                let w = (chunks[1].width.saturating_sub(2)) as usize;
-                let h = (chunks[1].height.saturating_sub(2)) as usize;
+            // 4. Optional: Logs Overlay (Bottom Right, Small)
+            // Only show if there's space
+            if size.width > 80 && size.height > 20 {
+                let log_area = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
+                    .split(size)[1];
                 
-                match compositor.render(w, h) {
-                    Ok(s) => s,
-                    Err(e) => format!("Render Error: {}", e),
-                }
-            };
+                let log_split = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(60), Constraint::Percentage(40)].as_ref())
+                    .split(log_area);
 
-            let output = Paragraph::new(content)
-                .block(Block::default().title(title).borders(Borders::ALL))
-                .wrap(Wrap { trim: true });
-            f.render_widget(output, chunks[1]);
-
-            // 3. Logs (using tui-logger)
-            let logs = TuiLoggerWidget::default()
-                .block(Block::default().title(" Consensus Stream ").borders(Borders::ALL))
-                .output_separator('|')
-                .output_timestamp(Some("%H:%M:%S".to_string()))
-                .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
-                .output_target(false)
-                .output_file(false)
-                .output_line(false);
-            f.render_widget(logs, chunks[2]);
-
-            // 4. Intent / Input
-            let input_text = format!("Last Intent: {}\n> {}_", intent, input_buffer);
-            let input = Paragraph::new(input_text)
-                .block(Block::default().title(" User Intent ").borders(Borders::ALL))
-                .wrap(Wrap { trim: true });
-            f.render_widget(input, chunks[3]);
+                let logs = TuiLoggerWidget::default()
+                    .output_separator('|')
+                    .output_timestamp(None)
+                    .output_level(None)
+                    .output_target(false)
+                    .output_file(false)
+                    .output_line(false)
+                    .style(ratatui::style::Style::default().fg(ratatui::style::Color::DarkGray));
+                
+                // Render logs in bottom right
+                f.render_widget(logs, log_split[1]);
+            }
         })?;
 
         // Event Handling

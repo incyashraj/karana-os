@@ -79,8 +79,11 @@ This roadmap evolves the current v1.0 prototype (Linux-based Userspace Monad) in
     *   This serves as the "Context" for the AR Overlay.
 
 ### 3.2 AR Compositor
-*   **Status**: Planned.
-*   **UI**: Migrate TUI concepts to a graphical overlay (using `wgpu` or `druid`).
+*   **Status**: Implemented (TUI-HUD v1).
+*   **UI**: Migrated TUI to a frameless, HUD-style overlay.
+    *   **Design**: "Smart Glass" aesthetic with corner markers and floating widgets.
+    *   **Tech**: `ratatui` + Custom `AsciiRenderer` (Frameless).
+    *   **Future**: Port to `wgpu` for real graphical overlay.
 *   **HUD**: Heads-Up Display for vital stats (Time, Battery, Next Meeting).
 
 ---
