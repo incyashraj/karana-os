@@ -39,7 +39,7 @@ pub fn build_root_ui() -> impl Widget<AppState> {
     // Layer 3: Notifications / Nudges
     // Positioned at the top-right or center-top
     let overlay_layer = Align::right(
-        Align::top(
+        Align::vertical(druid::UnitPoint::TOP,
             nudge.padding(20.0)
         )
     );

@@ -1,13 +1,13 @@
 use druid::{
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    Size, UpdateCtx, Widget, WidgetExt, Color, Point
+    Size, UpdateCtx, Widget, WidgetExt, Point, WidgetPod
 };
 use druid::widget::{Flex, Label, TextBox, Button};
 use crate::state::{AppState, PanelData};
 use crate::ui::theme;
 
 pub struct ZStack<T> {
-    children: Vec<Box<dyn Widget<T>>>,
+    children: Vec<WidgetPod<T, Box<dyn Widget<T>>>>,
 }
 
 impl<T: Data> ZStack<T> {
@@ -16,7 +16,7 @@ impl<T: Data> ZStack<T> {
     }
 
     pub fn with_child(mut self, child: impl Widget<T> + 'static) -> Self {
-        self.children.push(Box::new(child));
+        self.children.push(WidgetPod::new(Box::new(child)));
         self
     }
 }

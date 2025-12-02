@@ -1,4 +1,4 @@
-use druid::{Widget, WidgetExt, Color};
+use druid::{Widget, WidgetExt, Color, RenderContext};
 use druid::widget::{Flex, Label, Container, List, Scroll, Painter, Button};
 use crate::state::{AppState, PanelData};
 use crate::ui::theme;
@@ -40,7 +40,7 @@ fn build_single_panel() -> impl Widget<PanelData> {
         Label::new(|data: &PanelData, _env: &_| data.content.clone())
             .with_font(theme::FONT_CODE)
             .with_text_color(theme::TEXT_GRAY)
-            .with_line_break_mode(druid::widget::LineBreakMode::WordWrap)
+            .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
     )
     .padding(10.0)
     .expand_width();

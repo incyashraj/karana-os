@@ -16,7 +16,7 @@ fn main() -> Result<(), PlatformError> {
     let main_window = WindowDesc::new(build_root_ui())
         .title("Kāraṇa OS - Symbiotic Horizon")
         .window_size((1280.0, 800.0))
-        .min_size((800.0, 600.0))
+        .with_min_size((800.0, 600.0))
         .resizable(true);
 
     // Launch the app
