@@ -18,3 +18,19 @@ pub mod state;
 pub mod hardware;
 pub mod identity;
 pub mod ipc;
+pub mod oracle;
+pub mod celestia;
+pub mod glasses;
+pub mod voice;
+pub mod camera;
+pub mod timer;
+pub mod notifications;
+pub mod hud;
+pub mod wallet;
+pub mod onboarding;
+
+// Intelligence modules
+pub mod context;
+pub mod learning;
+pub mod memory;
+pub mod proactive;

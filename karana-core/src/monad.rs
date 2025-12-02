@@ -21,6 +21,8 @@ use crate::hardware::KaranaHardware;
 use crate::hardware::haptic::HapticPattern;
 use crate::identity::KaranaIdentity;
 use crate::ipc;
+use crate::oracle::KaranaOracle;
+use crate::wallet::KaranaWallet;
 use alloy_primitives::U256;
 
 /// Real output directory for intent actions
@@ -46,6 +48,10 @@ pub struct KaranaMonad {
     hardware: Arc<KaranaHardware>,
     #[allow(dead_code)]
     identity: Arc<Mutex<KaranaIdentity>>,
+    /// Phase 8: Real AI ↔ Blockchain Oracle
+    oracle: Arc<Mutex<KaranaOracle>>,
+    /// Node wallet for signing block production transactions
+    wallet: Arc<Mutex<KaranaWallet>>,
 }
 
 
@@ -56,6 +62,23 @@ pub struct KaranaConfig {
 }
 
 impl KaranaMonad {
+    /// Phase 8: Process intent through AI ↔ Blockchain Oracle
+    /// This is the REAL pipeline: Natural Language → AI Understanding → Blockchain Query → Formatted Response
+    async fn process_oracle_intent(&self, intent: &str, user_did: &str) -> Result<String> {
+        log::info!("[ORACLE] Processing natural language intent: '{}'", intent);
+        
+        // Use the oracle to process the full query
+        let response = {
+            let oracle = self.oracle.lock().unwrap();
+            oracle.process_query(intent, user_did)?
+        };
+        
+        // Haptic success feedback
+        let _ = self.hardware.haptic.lock().unwrap().play_pattern(HapticPattern::Success);
+        
+        Ok(format!("═══ ORACLE RESPONSE ═══\n{}\n═══════════════════════", response))
+    }
+
     /// Phase 7.7: Full pipeline status
     fn get_pipeline_status(&self) -> String {
         let (zk_queued, zk_max) = crate::zk::get_batch_status();
@@ -232,6 +255,63 @@ impl KaranaMonad {
         // Phase v1.0: Persistent State
         let persist = Arc::new(KaranaPersist::new("/dev/sda1")); // Stub root dev
 
+        // Phase 9: Node Wallet for signing transactions
+        // Try to load existing wallet or create new one
+        let wallet_path = format!("{}/node_wallet.enc", base_path);
+        let wallet_path_ref = std::path::Path::new(&wallet_path);
+        let device_id = "node-primary"; // Static device ID for the node wallet
+        
+        let wallet = if wallet_path_ref.exists() {
+            // Load existing wallet (with empty password for node wallet)
+            match KaranaWallet::load_encrypted(wallet_path_ref, "") {
+                Ok(w) => {
+                    log::info!("[WALLET] Loaded node wallet: {}", w.did());
+                    w
+                },
+                Err(e) => {
+                    log::warn!("[WALLET] Failed to load wallet ({}), generating new", e);
+                    let result = KaranaWallet::generate(device_id).context("Failed to generate wallet")?;
+                    result.wallet.save_encrypted(wallet_path_ref, "").ok();
+                    log::info!("[WALLET] Generated new node wallet: {}", result.wallet.did());
+                    result.wallet
+                }
+            }
+        } else {
+            // Generate new wallet
+            let result = KaranaWallet::generate(device_id).context("Failed to generate wallet")?;
+            result.wallet.save_encrypted(wallet_path_ref, "").ok();
+            log::info!("[WALLET] Generated new node wallet: {}", result.wallet.did());
+            result.wallet
+        };
+        let wallet = Arc::new(Mutex::new(wallet));
+
+        // Phase 8: Real AI ↔ Blockchain Oracle (with wallet for signing)
+        // Connects AI intent understanding to REAL blockchain operations
+        // NOTE: Oracle needs its own wallet instance since it wraps in Arc<Mutex<>>
+        let oracle = {
+            // Create a second wallet instance for the Oracle (same identity)
+            let oracle_wallet = if wallet_path_ref.exists() {
+                KaranaWallet::load_encrypted(wallet_path_ref, "").ok()
+            } else {
+                None
+            };
+            
+            let mut o = KaranaOracle::new(
+                ai.clone(),
+                chain.clone(),
+                storage.clone(),
+                ledger.clone(),
+                gov.clone(),
+            );
+            
+            if let Some(w) = oracle_wallet {
+                o.set_wallet(w);
+            }
+            
+            Arc::new(Mutex::new(o))
+        };
+        log::info!("[ORACLE] Initialized with REAL ledger, governance & wallet");
+
         Ok(Self {
             boot,
             runtime,
@@ -249,6 +329,8 @@ impl KaranaMonad {
             persist,
             hardware,
             identity,
+            oracle,
+            wallet,
         })
     }
 
@@ -426,8 +508,8 @@ impl KaranaMonad {
                         let req_id = req.request_id;
                         let prompt = req.prompt.clone();
                         
-                        // Get our DID for response
-                        let my_did = self.identity.lock().unwrap().get_active_did().unwrap_or("Node-Alpha".to_string());
+                        // Get our DID from wallet for response
+                        let my_did = self.wallet.lock().unwrap().did().to_string();
                         
                         tokio::task::spawn_blocking(move || {
                             let result = match ai_clone.lock().unwrap().predict(&prompt, 100) {
@@ -456,7 +538,7 @@ impl KaranaMonad {
                         
                         // Verify DID matches local user (or trusted peer)
                         // For now, we just log it and update UI if it's "our" DID
-                        let local_did = self.identity.lock().unwrap().get_active_did().unwrap_or_default();
+                        let local_did = self.wallet.lock().unwrap().did().to_string();
                         if clip.did == local_did {
                             log::info!("Atom 5 (Ecosystem): Syncing Clipboard (Self-Sovereign Sync)...");
                             let _ = self.ui.render_intent(format!("Clipboard Synced: {}", clip.content), vec![]).await;
@@ -520,6 +602,51 @@ impl KaranaMonad {
                 }
 
                 // ═══════════════════════════════════════════════════════════════════
+                // PHASE 8: AI ↔ Blockchain Oracle (Natural Language Queries)
+                // Intent → AI Parse → Blockchain Query → AI Format → UI Display
+                // ═══════════════════════════════════════════════════════════════════
+                // Handle natural language blockchain queries:
+                // - "show my files" / "what files do I have"
+                // - "check my balance" / "how much KARA do I have"
+                // - "store this note: ..." / "save file ..."
+                // - "who owns ..." / "look up ..."
+                // - Any other freeform query that needs blockchain data
+                let is_oracle_query = intent.contains("my files") || 
+                    intent.contains("my balance") || 
+                    intent.contains("show ") ||
+                    intent.contains("check ") ||
+                    intent.contains("look up") ||
+                    intent.contains("store ") ||
+                    intent.contains("save ") ||
+                    intent.starts_with("query ") ||
+                    intent.starts_with("ask ") ||
+                    intent.starts_with("? ");
+                
+                if is_oracle_query {
+                    // Get user's DID from wallet (real) or identity (legacy)
+                    let user_did = self.wallet.lock().unwrap().did().to_string();
+                    
+                    match self.process_oracle_intent(&intent, &user_did).await {
+                        Ok(response) => {
+                            log::info!("[ORACLE] ✓ Query processed successfully");
+                            let _ = self.ui.render_intent(response, vec![]).await;
+                            
+                            // Attest the query to chain
+                            let attest_tx = self.chain.attest_intent(&user_did, &intent, &[], "oracle_query");
+                            {
+                                let mut pool = self.mempool.lock().unwrap();
+                                pool.push(attest_tx);
+                            }
+                            continue;
+                        },
+                        Err(e) => {
+                            log::error!("[ORACLE] ✗ Query failed: {}", e);
+                            let _ = self.hardware.haptic.lock().unwrap().play_pattern(HapticPattern::Error);
+                        }
+                    }
+                }
+
+                // ═══════════════════════════════════════════════════════════════════
                 // PHASE 7.1 + 7.7: Real Action Execution (Full Pipeline)
                 // Input → AI → ZK → Storage → Swarm → Chain → UI → Haptic
                 // ═══════════════════════════════════════════════════════════════════
@@ -560,20 +687,26 @@ impl KaranaMonad {
                 let mut txs = Vec::new();
                 {
                     let mut pool = self.mempool.lock().unwrap();
-                    // Simulate a transaction every block for liveness
+                    // Create a REAL signed transaction for liveness every other block
                     if height % 2 == 0 {
-                        txs.push(Transaction {
-                            sender: "Node-Alpha".to_string(),
-                            data: TransactionData::Transfer { to: "Node-Beta".to_string(), amount: 10u128 },
-                            signature: "mock_sig".to_string(),
-                            nonce: height,
-                        });
+                        let wallet = self.wallet.lock().unwrap();
+                        let tx = crate::chain::create_signed_transaction(
+                            &wallet,
+                            TransactionData::Transfer { 
+                                to: "Node-Beta".to_string(), 
+                                amount: 10u128 
+                            },
+                        );
+                        log::info!("[CHAIN] Created signed tx: {} → Node-Beta (10 KARA) [Ed25519 ✓]", 
+                            &wallet.did()[..20]);
+                        txs.push(tx);
                     }
                     txs.append(&mut pool);
                 }
                 
-                // Create Block
-                let block = Block::new(parent_hash.clone(), height, "Node-Alpha".to_string(), txs.clone());
+                // Create Block (use our DID as proposer)
+                let proposer = self.wallet.lock().unwrap().did().to_string();
+                let block = Block::new(parent_hash.clone(), height, proposer, txs.clone());
                 log::info!("Atom 1 (Chain): Produced Block #{} [Hash: {}] with {} txs", height, block.hash, txs.len());
                 
                 // Update UI

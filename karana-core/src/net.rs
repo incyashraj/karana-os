@@ -421,4 +421,44 @@ impl KaranaSwarm {
         self.cmd_tx.send(SwarmCmd::SyncClipboard(clip)).await?;
         Ok(())
     }
+    
+    /// Phase 7.3: Broadcast a signed intent completion to the network
+    /// Returns the number of peers that received the message
+    pub async fn broadcast_intent(&self, intent: &str, proof_hash: &str, user_did: &str) -> Result<String> {
+        let intent_msg = IntentBroadcast {
+            intent: intent.to_string(),
+            proof_hash: proof_hash.to_string(),
+            sender_did: user_did.to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs(),
+        };
+        
+        let data = serde_json::to_vec(&intent_msg)?;
+        let msg_id = self.broadcast_with_tracking(data, "intent").await?;
+        
+        log::info!("[SWARM] Intent '{}' broadcast by {} [proof: {}...]", 
+            intent, user_did, &proof_hash[..12.min(proof_hash.len())]);
+        
+        Ok(msg_id)
+    }
+    
+    /// Get number of connected peers
+    pub fn peer_count(&self) -> u64 {
+        self.stats.peers_connected.load(Ordering::Relaxed)
+    }
+    
+    /// Check if swarm has any connected peers
+    pub fn has_peers(&self) -> bool {
+        self.peer_count() > 0
+    }
+}
+
+/// Phase 7.3: Intent broadcast message
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IntentBroadcast {
+    pub intent: String,
+    pub proof_hash: String,
+    pub sender_did: String,
+    pub timestamp: u64,
 }

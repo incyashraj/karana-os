@@ -51,6 +51,7 @@ fn test_blockchain_flow() {
         data: TransactionData::Transfer { to: "Bob".to_string(), amount: 100 },
         signature: "sig".to_string(),
         nonce: 1,
+        public_key: None,
     };
 
     let block = Block::new(
@@ -76,6 +77,7 @@ fn test_blockchain_flow() {
         },
         signature: "sig".to_string(),
         nonce: 2,
+        public_key: None,
     };
 
     let block2 = Block::new(

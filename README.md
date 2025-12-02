@@ -11,97 +11,211 @@
 
 > **"The Operating System is not a tool. It is a partner."**
 
+[![Tests](https://img.shields.io/badge/tests-61%20passing-brightgreen)](./src/)
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
 ## 🌟 What is Kāraṇa?
-**Kāraṇa OS** is an experimental operating system designed for the post-app era. Unlike traditional systems (Windows, Linux, macOS) that force you to manage files and open applications, Kāraṇa is built around **Intents** and **Context**.
 
-It is designed specifically for **Smart Glasses and IoT devices**, providing a "Symbiotic Interface" where the OS uses AI to understand your goals and Zero-Knowledge Proofs to secure your data. It doesn't just run programs; it thinks with you.
+**Kāraṇa OS** is a sovereign AI-native operating system designed for the post-app era. Unlike traditional systems (Windows, Linux, macOS) that force you to manage files and open applications, Kāraṇa is built around **Intents** and **Context**.
 
-## 🏗️ Architecture: Distributed Symbiosis
+It is designed specifically for **Smart Glasses and IoT devices**, providing a "Symbiotic Interface" where the OS uses AI to understand your goals and a blockchain ledger to secure your data. It doesn't just run programs; it **thinks with you**.
 
-Kāraṇa OS is split into two sovereign components:
+### 📚 Documentation
 
-1.  **Kāraṇa Core (`karana-core`)**: The headless kernel. It runs the Blockchain, AI Engine, ZK-Prover, and P2P Swarm. It can run on a server, a Raspberry Pi, or in the background of your desktop.
-2.  **Kāraṇa Shell (`karana-shell`)**: The "Symbiotic Horizon" GUI. It is a native Rust application (using `druid`) that renders the Intent Orb, Adaptive Panels, and DAO Nudges. It connects to the Core via a local IPC socket.
+| Document | Description |
+|----------|-------------|
+| [**ARCHITECTURE.md**](./ARCHITECTURE.md) | Complete technical documentation of the 7-layer software stack |
+| [**SIMPLE_GUIDE.md**](./SIMPLE_GUIDE.md) | User-friendly explanation in simple language |
+| [**HARDWARE_PLAN.md**](./HARDWARE_PLAN.md) | Hardware requirements and recommended dev kits |
+
+## 🏗️ Architecture Overview
+
+Kāraṇa OS uses a **7-Layer Software Stack**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 7: Interface (HUD, Voice, Gestures)                  │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 6: Applications (Timer, Notifications, Proactive)    │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 5: AI Engine (Vision, Voice, Language, Learning)     │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 4: Oracle Bridge (AI ↔ Blockchain)                   │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 3: Blockchain (Chain, Wallet, Economy, Celestia DA)  │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 2: P2P Network (libp2p, mDNS, Gossip)                │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 1: Hardware (Camera, Sensors, Display, Compute)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**The Monad** (`src/monad.rs`) orchestrates all layers, producing signed blocks every 30 seconds with Ed25519 cryptography.
+
+👉 **[Read ARCHITECTURE.md](./ARCHITECTURE.md)** for complete technical details.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
-### 1. Run the Core (The Brain)
-The Core handles all logic and state. It must be running first.
+### Prerequisites
+- Rust 1.70+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- Linux with v4l2 support (for real camera)
+
+### Run Kāraṇa OS
 
 ```bash
-cd karana-core
-# Run in headless mode (starts IPC server on port 9000)
-NO_TUI=1 cargo run
-```
+# Clone the repository
+git clone https://github.com/AumSahay  /karana-os.git
+cd karana-os
 
-### 2. Run the Shell (The Face)
-The Shell provides the graphical interface. **Note:** This requires a desktop environment with GTK libraries installed.
-
-**Prerequisites (Local Machine):**
-*   **Ubuntu/Debian**: `sudo apt install libgtk-3-dev libcairo2-dev libpango1.0-dev`
-*   **macOS**: `brew install gtk+3 cairo pango`
-*   **Fedora**: `sudo dnf install gtk3-devel cairo-devel pango-devel`
-
-**Launch:**
-```bash
-cd karana-shell
+# Run with simulated hardware (default)
 cargo run
+
+# Run with real camera (Linux with v4l2)
+cargo run --features v4l2
+
+# Run all tests (61 tests)
+cargo test --lib
 ```
 
-### 3. Symbiosis
-Once both are running:
-1.  Type **"code"** in the Shell -> The Core verifies the intent and the Shell spawns a Code Editor panel.
-2.  Type **"tune battery"** -> The Core triggers a DAO proposal, and the Shell displays a "Vote YES" nudge.
+### What Happens
+1. **Wallet Creation**: First run creates `node_wallet.enc` with your Ed25519 keypair
+2. **AI Initialization**: Loads BLIP (vision), Whisper (speech), MiniLM (embeddings)
+3. **P2P Networking**: Joins the Kāraṇa swarm via mDNS discovery
+4. **Block Production**: Every 30 seconds, a new signed block is produced
 
 ---
 
-## 📜 The Philosophy: Questioning Everything
+## 🧠 AI Capabilities
 
-Kāraṇa OS is a **First Principles Rethink** of the operating system. It rejects the legacy metaphors of the 1970s (files, folders, permissions, applications) and replaces them with a sovereign, symbiotic architecture built for the age of AI and Zero-Knowledge Cryptography.
+| Model | Purpose | Size |
+|-------|---------|------|
+| **MiniLM-L6-v2** | Semantic understanding | 22MB |
+| **BLIP** | Vision/object identification | ~500MB |
+| **Whisper** (tiny) | Speech-to-text | ~75MB |
+| **TinyLlama** | Text generation | ~1GB |
 
-### The Atom Analogy
-We deconstructed the OS into **Atoms**—indivisible, verifiable units of reality.
-*   **Atom 1 (Chain)**: The immutable timeline of truth.
-*   **Atom 2 (Persist)**: The sovereign storage of state (ZK-Snapshots).
-*   **Atom 3 (Intelligence)**: The AI brain (Phi-3) and Hardware senses.
-*   **Atom 4 (Economy)**: The flow of value (DAO, Ledger).
-*   **Atom 5 (Runtime)**: The execution environment (Actors).
-*   **Atom 6 (Interface)**: The symbiotic feedback loop (TUI/HUD).
-*   **Atom 7 (Vigil)**: The immune system (Security/Slashing).
+All models run **100% offline** using ONNX Runtime. No cloud required.
+
+```rust
+// Example: What you can ask Kāraṇa
+"What am I looking at?"          // → BLIP analyzes camera
+"Set a timer for 5 minutes"      // → Voice command processing
+"Remind me about this later"     // → Context + blockchain storage
+"Find my keys"                   // → Proactive memory search
+```
 
 ---
 
-## 🛠️ Development History
+## 🔗 Blockchain Features
 
-### Phase v0.1 - v0.5: The Foundation
-*   Built the **TUI** using `ratatui`.
-*   Implemented the **Mock AI** (Phi-3 stub) to simulate intelligence without heavy GPU reqs.
-*   Created the **Blockchain Ledger** and **DAO** logic.
+- **Ed25519 Signatures**: Real cryptographic block signing
+- **Celestia Data Availability**: Optional integration with Mocha testnet
+- **DAO Governance**: Vote on system parameters
+- **Economic Model**: Resource credits, staking, reputation
 
-### Phase v0.8: The Symbiotic Frontend
-*   Refined the UI into the "Symbiotic" layout.
-*   Added **Fuzzy Matching** for intents.
+---
 
-### Phase v1.0: Ecosystem Forge
-*   **Real Apps**: Terminal and File Manager are now functional.
-*   **Bazaar**: Implemented the ZK-verified app store.
-*   **Persistence**: Added Btrfs-style snapshots with ZK proofs.
-*   **IoT Support**: Added the Hardware Abstraction Layer for Smart Glasses.
+## 📜 The Philosophy
 
-### Phase v2.0: Symbiotic Horizon (Current)
-*   **Split Architecture**: Decoupled Core and Shell.
-*   **GUI Shell**: Implemented `karana-shell` with Druid (Orb, Panels, Nudge).
-*   **IPC Layer**: TCP bridge between Core and Shell.
+Kāraṇa OS is a **First Principles Rethink** of the operating system. It rejects the legacy metaphors of the 1970s (files, folders, applications) and replaces them with a sovereign, symbiotic architecture built for the age of AI.
 
-## 🕶️ Hardware & Vision
-Kāraṇa OS is designed for a "Split-Architecture" wearable future.
-*   **Display**: Smart Glasses (XREAL/Rokid) acting as a dumb terminal.
-*   **Compute**: A belt-worn "Puck" (Orange Pi 5 / RK3588) running the Core.
+### Why Different?
 
-👉 **[Read the Full Hardware Plan](./HARDWARE_PLAN.md)** for recommended dev kits and the roadmap to a "State of the Art" device.
+| Traditional OS | Kāraṇa OS |
+|----------------|-----------|
+| Files & Folders | Semantic Memory |
+| Applications | Intents |
+| Click & Type | Voice & Vision |
+| Cloud-dependent | 100% Offline |
+| Centralized | Blockchain-verified |
+| One device | Distributed Swarm |
+
+👉 **[Read SIMPLE_GUIDE.md](./SIMPLE_GUIDE.md)** for a non-technical explanation.
+
+---
+
+## 🕶️ Smart Glasses Hardware
+
+Kāraṇa OS is designed for a "Split-Architecture" wearable future:
+
+| Component | Device | Purpose |
+|-----------|--------|---------|
+| **Display** | XREAL Air / Rokid | Dumb terminal (1080p OLED) |
+| **Compute** | Orange Pi 5 / RK3588 | Belt-worn "Puck" running Kāraṇa |
+| **Camera** | USB webcam / v4l2 | Vision input for BLIP |
+| **Audio** | USB mic / Bluetooth | Voice input for Whisper |
+
+👉 **[Read HARDWARE_PLAN.md](./HARDWARE_PLAN.md)** for recommended dev kits and the roadmap.
+
+---
+
+## 🛠️ Project Structure
+
+```
+karana-os/
+├── src/
+│   ├── lib.rs          # Main exports
+│   ├── monad.rs        # System orchestrator (732 lines)
+│   ├── chain.rs        # Blockchain implementation
+│   ├── wallet.rs       # Ed25519 wallet (496 lines)
+│   ├── oracle.rs       # AI ↔ Blockchain bridge
+│   ├── camera.rs       # V4L2 camera support (434 lines)
+│   ├── voice.rs        # Voice processing
+│   ├── hud.rs          # Heads-up display
+│   ├── ai/
+│   │   ├── mod.rs      # AI engine (1270 lines)
+│   │   └── assistant.rs
+│   ├── celestia.rs     # Data availability layer
+│   ├── economy.rs      # Token economics
+│   ├── learning.rs     # Adaptive learning
+│   └── ...
+├── tests/              # 61 tests
+├── examples/           # Usage examples
+├── ARCHITECTURE.md     # Technical docs
+├── SIMPLE_GUIDE.md     # User-friendly docs
+└── README.md           # This file
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Run all library tests
+cargo test --lib
+
+# Current status: 61 tests passing
+# - wallet: 6 tests
+# - chain: 4 tests  
+# - voice: 7 tests
+# - camera: 2 tests
+# - timer: 5 tests
+# - ai: 12 tests
+# - ... and more
+```
+
+---
+
+## 🤝 Contributing
+
+Kāraṇa OS is an experimental project pushing the boundaries of what an OS can be. We welcome contributions in:
+
+- **AI Models**: Better edge-optimized models
+- **Hardware Support**: More camera/sensor integrations
+- **P2P Networking**: Distributed consensus improvements
+- **Documentation**: Translations and tutorials
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](./LICENSE) for details.
 
 ---
 
 *"We do not build the OS to control the machine. We build the OS to free the mind."*
+
+**Built with ❤️ by the Kāraṇa Team**

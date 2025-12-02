@@ -12,3 +12,9 @@ iso/
 *.iso
 karana-core/models/*.safetensors
 karana-core/models/*.gguf
+
+# Planning docs
+DEVELOPMENT_PLAN.md
+CRITICAL_GAPS_ANALYSIS.md
+*.plan.md
+TODO*.md

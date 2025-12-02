@@ -78,7 +78,7 @@ impl Ledger {
         self.get_account(account).balance
     }
 
-    fn get_account(&self, recipient: &str) -> KaraToken {
+    pub fn get_account(&self, recipient: &str) -> KaraToken {
         match self.db.get(recipient.as_bytes()) {
             Ok(Some(data)) => serde_json::from_slice(&data).unwrap_or_default(),
             _ => KaraToken { balance: 0, staked: 0, reputation: 1.0 },
@@ -224,7 +224,7 @@ impl Governance {
         self.db.put(key.as_bytes(), data).expect("Failed to save proposal");
     }
 
-    fn get_proposal(&self, id: u64) -> Option<Proposal> {
+    pub fn get_proposal(&self, id: u64) -> Option<Proposal> {
         let key = format!("proposal:{}", id);
         match self.db.get(key.as_bytes()) {
             Ok(Some(data)) => serde_json::from_slice(&data).ok(),

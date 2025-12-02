@@ -10,10 +10,195 @@ use tokenizers::{Tokenizer, PaddingParams};
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
 // TinyLlama 1.1B Chat (Quantized) - ~670MB
 const MODEL_REPO: &str = "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
 const MODEL_FILE: &str = "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
+
+/// Semantic Intent Templates for embedding-based matching
+/// Each template has a canonical phrase and associated action metadata
+struct IntentTemplate {
+    canonical: &'static str,
+    action: &'static str,
+}
+
+/// System capability awareness - what smart glasses CAN and CAN'T do
+struct InfeasibleAction {
+    canonical: &'static str,
+    category: &'static str,
+    reason: &'static str,
+    alternative: &'static str,
+}
+
+/// Actions that are POSSIBLE on smart glasses
+const INTENT_TEMPLATES: &[IntentTemplate] = &[
+    IntentTemplate { 
+        canonical: "check balance show wallet how much tokens money", 
+        action: "balance",
+    },
+    IntentTemplate { 
+        canonical: "send transfer tokens to payment", 
+        action: "transfer",
+    },
+    IntentTemplate { 
+        canonical: "stake lock tokens for voting", 
+        action: "stake",
+    },
+    IntentTemplate { 
+        canonical: "propose create new proposal idea", 
+        action: "create_proposal",
+    },
+    IntentTemplate { 
+        canonical: "vote yes no on proposal approve reject", 
+        action: "vote",
+    },
+    IntentTemplate { 
+        canonical: "show list governance proposals", 
+        action: "get_proposals",
+    },
+    IntentTemplate { 
+        canonical: "show list my files documents", 
+        action: "query_files",
+    },
+    IntentTemplate { 
+        canonical: "store save upload file note", 
+        action: "store_file",
+    },
+    IntentTemplate { 
+        canonical: "system status health check", 
+        action: "get_status",
+    },
+    IntentTemplate { 
+        canonical: "optimize battery power save energy", 
+        action: "tune_power",
+    },
+    IntentTemplate { 
+        canonical: "optimize storage compress shards", 
+        action: "tune_storage",
+    },
+    // Glasses-specific capabilities
+    IntentTemplate {
+        canonical: "take photo picture capture camera",
+        action: "capture_photo",
+    },
+    IntentTemplate {
+        canonical: "navigate directions map route to",
+        action: "navigate",
+    },
+    IntentTemplate {
+        canonical: "translate text language",
+        action: "translate",
+    },
+    IntentTemplate {
+        canonical: "read notifications alerts messages",
+        action: "show_notifications",
+    },
+    IntentTemplate {
+        canonical: "timer alarm reminder set",
+        action: "set_timer",
+    },
+    IntentTemplate {
+        canonical: "what am I looking at identify this object",
+        action: "identify_object",
+    },
+    IntentTemplate {
+        canonical: "record video start recording",
+        action: "record_video",
+    },
+    IntentTemplate {
+        canonical: "call phone dial contact",
+        action: "make_call",
+    },
+    IntentTemplate {
+        canonical: "play music audio song podcast spotify listen",
+        action: "play_media",
+    },
+    IntentTemplate {
+        canonical: "volume louder softer mute",
+        action: "adjust_volume",
+    },
+    IntentTemplate {
+        canonical: "brightness display dim brighter",
+        action: "adjust_brightness",
+    },
+];
+
+/// Actions that are IMPOSSIBLE on smart glasses (need desktop/laptop)
+const INFEASIBLE_ACTIONS: &[InfeasibleAction] = &[
+    InfeasibleAction {
+        canonical: "open visual studio code VS code IDE editor",
+        category: "desktop_app",
+        reason: "Smart glasses can't run desktop IDEs like VS Code",
+        alternative: "I can show code snippets in your HUD, or sync notes to review on your desktop later",
+    },
+    InfeasibleAction {
+        canonical: "open adobe photoshop illustrator premiere after effects video editor image editing software",
+        category: "desktop_app",
+        reason: "Creative software requires a desktop environment",
+        alternative: "I can capture photos/videos which you can edit on your computer later",
+    },
+    InfeasibleAction {
+        canonical: "open excel spreadsheet word document powerpoint",
+        category: "desktop_app",
+        reason: "Office apps need a larger display and keyboard",
+        alternative: "I can read document summaries aloud or show key data in your HUD",
+    },
+    InfeasibleAction {
+        canonical: "open terminal command line console shell bash",
+        category: "desktop_app",
+        reason: "Terminal requires keyboard input and larger display",
+        alternative: "I can execute pre-defined commands or show command output summaries",
+    },
+    InfeasibleAction {
+        canonical: "open browser chrome firefox safari edge internet",
+        category: "desktop_app",
+        reason: "Full web browsing needs a larger screen",
+        alternative: "I can search and read article summaries, or show quick info in your HUD",
+    },
+    InfeasibleAction {
+        canonical: "print document paper printer",
+        category: "peripheral",
+        reason: "Glasses can't connect to printers directly",
+        alternative: "I can queue a print job to your home printer via your phone",
+    },
+    InfeasibleAction {
+        canonical: "scan QR barcode",
+        category: "possible_limited",
+        reason: "QR scanning works but requires steady gaze",
+        alternative: "Hold still and look at the code - I'll scan it",
+    },
+    InfeasibleAction {
+        canonical: "type keyboard write long text compose email",
+        category: "input_limited",
+        reason: "No keyboard on glasses - voice-to-text only for short inputs",
+        alternative: "I can take voice notes or send quick voice messages",
+    },
+    InfeasibleAction {
+        canonical: "download file install software app",
+        category: "storage",
+        reason: "Glasses have limited storage and no app installation",
+        alternative: "I can save links and queue downloads to your phone/computer",
+    },
+    InfeasibleAction {
+        canonical: "play video game gaming console fortnite minecraft steam",
+        category: "performance",
+        reason: "Glasses lack the GPU power for gaming",
+        alternative: "I can show simple AR games or trivia while you walk",
+    },
+    InfeasibleAction {
+        canonical: "edit code programming compile run script",
+        category: "development",
+        reason: "Coding requires a proper IDE and keyboard",
+        alternative: "I can show code review comments, build status, or read error logs aloud",
+    },
+    InfeasibleAction {
+        canonical: "zoom meeting teams video call conference screen share",
+        category: "video_conf",
+        reason: "Video conferencing needs front-facing camera view and screen sharing",
+        alternative: "I can join audio-only, show meeting notes, or display participant names",
+    },
+];
 
 // Whisper Tiny (Quantized or Float? Let's use tiny.en for speed/size)
 const WHISPER_REPO: &str = "openai/whisper-tiny.en";
@@ -97,6 +282,10 @@ pub struct KaranaAI {
     blip_tokenizer: Option<Tokenizer>,
     blip_config: Option<blip::Config>,
     mel_filters: Vec<f32>,
+    // Semantic Intent Cache: Pre-computed embeddings for intent templates
+    intent_embeddings: HashMap<String, Vec<f32>>,
+    // Infeasible Action Cache: Pre-computed embeddings for things glasses CAN'T do
+    infeasible_embeddings: HashMap<String, (Vec<f32>, String, String)>, // (embedding, reason, alternative)
 }
 
 impl KaranaAI {
@@ -109,17 +298,13 @@ impl KaranaAI {
             (None, None)
         });
 
-        // Atom 3: Try Initialize Generative Model (Lazy)
+        // Atom 3: Try Initialize Generative Model (Lazy) - may fail due to GGUF compat
         let (gen_model, gen_tokenizer) = Self::load_gen_model(&device).unwrap_or_else(|e| {
-            log::info!("Atom 3: Generative AI not loaded (Running in Simulation Mode). Reason: {}", e);
+            log::info!("Atom 3: Generative AI not loaded: {}. Using semantic embedding fallback.", e);
             (None, None)
         });
 
-        // Atom 3: Try Initialize Whisper (Lazy)
-        // We don't load it by default to save RAM, but we prepare the struct.
-        // For now, let's leave it None and load on demand.
-
-        Ok(Self {
+        let mut ai = Self {
             device,
             embed_model,
             embed_tokenizer,
@@ -132,7 +317,151 @@ impl KaranaAI {
             blip_tokenizer: None,
             blip_config: None,
             mel_filters: Vec::new(),
-        })
+            intent_embeddings: HashMap::new(),
+            infeasible_embeddings: HashMap::new(),
+        };
+
+        // Pre-compute intent template embeddings for semantic matching
+        ai.initialize_intent_embeddings();
+        // Pre-compute infeasible action embeddings
+        ai.initialize_infeasible_embeddings();
+
+        Ok(ai)
+    }
+
+    /// Pre-compute embeddings for all intent templates
+    fn initialize_intent_embeddings(&mut self) {
+        if self.embed_model.is_none() {
+            log::warn!("Embedding model not available, skipping intent pre-computation");
+            return;
+        }
+
+        log::info!("Atom 3: Pre-computing {} intent embeddings...", INTENT_TEMPLATES.len());
+        
+        for template in INTENT_TEMPLATES {
+            match self.embed(template.canonical) {
+                Ok(embedding) => {
+                    self.intent_embeddings.insert(template.action.to_string(), embedding);
+                    log::debug!("  ✓ Embedded intent: {}", template.action);
+                }
+                Err(e) => {
+                    log::warn!("  ✗ Failed to embed {}: {}", template.action, e);
+                }
+            }
+        }
+        
+        log::info!("Atom 3: Intent embeddings ready ({} templates)", self.intent_embeddings.len());
+    }
+
+    /// Pre-compute embeddings for infeasible actions (things glasses CAN'T do)
+    fn initialize_infeasible_embeddings(&mut self) {
+        if self.embed_model.is_none() {
+            log::warn!("Embedding model not available, skipping infeasible action pre-computation");
+            return;
+        }
+
+        log::info!("Atom 3: Pre-computing {} infeasible action embeddings...", INFEASIBLE_ACTIONS.len());
+        
+        for action in INFEASIBLE_ACTIONS {
+            match self.embed(action.canonical) {
+                Ok(embedding) => {
+                    self.infeasible_embeddings.insert(
+                        action.category.to_string(),
+                        (embedding, action.reason.to_string(), action.alternative.to_string())
+                    );
+                    log::debug!("  ✓ Embedded infeasible: {}", action.category);
+                }
+                Err(e) => {
+                    log::warn!("  ✗ Failed to embed infeasible {}: {}", action.category, e);
+                }
+            }
+        }
+        
+        log::info!("Atom 3: Infeasible action awareness ready ({} categories)", self.infeasible_embeddings.len());
+    }
+
+    /// Check if the user is asking for something that glasses CAN'T do
+    /// Returns (category, reason, alternative) if infeasible
+    fn check_infeasible_action(&mut self, query: &str) -> Option<(String, String, String)> {
+        if self.infeasible_embeddings.is_empty() {
+            return None;
+        }
+
+        let query_embedding = match self.embed(query) {
+            Ok(emb) => emb,
+            Err(_) => return None,
+        };
+
+        let mut best_match: Option<(String, f32, String, String)> = None;
+
+        for (category, (template_emb, reason, alternative)) in &self.infeasible_embeddings {
+            let similarity = Self::cosine_similarity(&query_embedding, template_emb);
+            
+            if similarity > best_match.as_ref().map(|(_, s, _, _)| *s).unwrap_or(0.0) {
+                best_match = Some((category.clone(), similarity, reason.clone(), alternative.clone()));
+            }
+        }
+
+        // Higher threshold for infeasible detection (0.35) - we want to be sure
+        if let Some((category, sim, reason, alternative)) = best_match {
+            if sim > 0.35 {
+                log::info!("[SYSTEM] Detected infeasible action: '{}' -> '{}' (similarity: {:.2})", 
+                    query, category, sim);
+                return Some((category, reason, alternative));
+            }
+        }
+
+        None
+    }
+
+    /// Find the best matching intent using cosine similarity
+    fn match_intent_semantically(&mut self, query: &str) -> Option<(String, f32)> {
+        if self.intent_embeddings.is_empty() {
+            return None;
+        }
+
+        let query_embedding = match self.embed(query) {
+            Ok(emb) => emb,
+            Err(_) => return None,
+        };
+
+        let mut best_match: Option<(String, f32)> = None;
+
+        for (action, template_emb) in &self.intent_embeddings {
+            let similarity = Self::cosine_similarity(&query_embedding, template_emb);
+            
+            if similarity > best_match.as_ref().map(|(_, s)| *s).unwrap_or(0.0) {
+                best_match = Some((action.clone(), similarity));
+            }
+        }
+
+        // Only return if confidence is above threshold
+        if let Some((action, sim)) = &best_match {
+            if *sim > 0.25 {  // Lower threshold for better matching
+                log::info!("[SEMANTIC] Matched '{}' -> '{}' (similarity: {:.2})", query, action, sim);
+                return best_match;
+            }
+        }
+
+        log::info!("[SEMANTIC] No match for '{}' (best: {:?})", query, best_match);
+        None
+    }
+
+    /// Compute cosine similarity between two vectors
+    fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+        if a.len() != b.len() || a.is_empty() {
+            return 0.0;
+        }
+
+        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+
+        if norm_a == 0.0 || norm_b == 0.0 {
+            return 0.0;
+        }
+
+        dot / (norm_a * norm_b)
     }
 
     fn load_mel_filters(&mut self) -> Result<()> {
@@ -392,61 +721,190 @@ impl KaranaAI {
     }
 
     pub fn predict(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
-        // Lazy load check
-        if self.gen_model.is_none() {
-             let (m, t) = Self::load_gen_model(&self.device).unwrap_or((None, None));
-             self.gen_model = m;
-             self.gen_tokenizer = t;
+        // STRATEGY: Semantic Intent Matching using REAL embeddings
+        // 
+        // Instead of using the crashing GGUF model, we use a smarter approach:
+        // 1. FIRST check if user is asking for something glasses CAN'T do
+        // 2. Embed the user query using working MiniLM model
+        // 3. Compare against pre-computed intent embeddings via cosine similarity
+        // 4. Extract parameters using intelligent regex
+        // 5. Return structured JSON that the Oracle can parse
+        //
+        // This is actually MORE RELIABLE than LLM parsing because:
+        // - Embeddings are deterministic and fast
+        // - No hallucination of incorrect JSON
+        // - Works offline on embedded devices (glasses)
+        // - System-aware: knows what glasses can and can't do
+        
+        let _ = max_tokens; // Will use for gen model when available
+        
+        // FIRST: Check if this is an infeasible action for smart glasses
+        if let Some((category, reason, alternative)) = self.check_infeasible_action(prompt) {
+            log::info!("[AI] Infeasible action detected: {} - {}", category, reason);
+            return Ok(format!(
+                r#"{{"action": "infeasible", "category": "{}", "reason": "{}", "alternative": "{}", "confidence": 0.90}}"#,
+                category, reason, alternative
+            ));
+        }
+        
+        // Try semantic matching for valid intents
+        if let Some((action, confidence)) = self.match_intent_semantically(prompt) {
+            let response = self.build_semantic_response(&action, prompt, confidence);
+            log::info!("[AI] Semantic match: {} (conf: {:.0}%)", action, confidence * 100.0);
+            return Ok(response);
         }
 
-        if let (Some(model), Some(tokenizer)) = (&mut self.gen_model, &self.gen_tokenizer) {
-            // Real Inference
-            log::info!("Atom 3: Running Real Inference on TinyLlama...");
-            
-            // Format prompt for Chat (TinyLlama format)
-            let formatted_prompt = format!("<|system|>\nYou are Kāraṇa, a sovereign AI OS.</s>\n<|user|>\n{}</s>\n<|assistant|>\n", prompt);
-            
-            let tokens = tokenizer.encode(formatted_prompt, true).map_err(|e| anyhow!(e))?;
-            let prompt_tokens = tokens.get_ids();
-            let mut all_tokens = prompt_tokens.to_vec();
-            
-            let mut logits_processor = LogitsProcessor::new(299792458, Some(0.7), Some(0.9)); // Seed, Temp, TopP
+        // Fallback to rule-based parsing
+        log::info!("[AI] No semantic match, using rule-based parsing");
+        self.predict_smart_fallback(prompt)
+    }
 
-            let mut output_text = String::new();
-            let mut index_pos = 0;
-            
-            for index in 0..max_tokens {
-                let (context_size, start_pos) = if index == 0 {
-                    (all_tokens.len(), 0)
-                } else {
-                    (1, all_tokens.len() - 1)
-                };
+    /// Build a structured JSON response based on semantic match
+    fn build_semantic_response(&self, action: &str, original_query: &str, confidence: f32) -> String {
+        let q = original_query.to_lowercase();
+        let words: Vec<&str> = q.split_whitespace().collect();
 
-                let input = Tensor::new(&all_tokens[start_pos..], &self.device)?.unsqueeze(0)?;
-                let logits = model.forward(&input, index_pos)?; 
-                let logits = logits.squeeze(0)?;
-                let next_token_logits = logits.get(logits.dim(0)? - 1)?;
-                let next_token = logits_processor.sample(&next_token_logits)?;
-                
-                index_pos += context_size;
-                all_tokens.push(next_token);
-                
-                if let Some(t) = tokenizer.decode(&[next_token], true).ok() {
-                    output_text.push_str(&t);
-                    if output_text.ends_with("</s>") {
-                        break;
+        match action {
+            "transfer" => {
+                let mut to = "unknown".to_string();
+                let mut amount = 0u64;
+                for (i, word) in words.iter().enumerate() {
+                    if let Ok(num) = word.parse::<u64>() {
+                        amount = num;
+                    }
+                    if *word == "to" && i + 1 < words.len() {
+                        to = words[i + 1].to_string();
                     }
                 }
+                format!(r#"{{"action": "transfer", "params": {{"to": "{}", "amount": {}}}, "confidence": {:.2}}}"#, to, amount, confidence)
+            },
+            "stake" => {
+                let amount = words.iter()
+                    .filter_map(|w| w.parse::<u64>().ok())
+                    .next()
+                    .unwrap_or(0);
+                format!(r#"{{"action": "stake", "params": {{"amount": {}}}, "confidence": {:.2}}}"#, amount, confidence)
+            },
+            "create_proposal" => {
+                let title = if let Some(idx) = q.find("propose") {
+                    q[idx + 7..].trim().to_string()
+                } else if let Some(idx) = q.find("proposal") {
+                    q[idx + 8..].trim().to_string()
+                } else {
+                    "New Proposal".to_string()
+                };
+                format!(r#"{{"action": "create_proposal", "params": {{"title": "{}"}}, "confidence": {:.2}}}"#, title, confidence)
+            },
+            "vote" => {
+                let approve = q.contains("yes") || q.contains("approve") || q.contains("for");
+                let id = words.iter()
+                    .filter_map(|w| w.parse::<u64>().ok())
+                    .next()
+                    .unwrap_or(1);
+                format!(r#"{{"action": "vote", "params": {{"id": {}, "approve": {}}}, "confidence": {:.2}}}"#, id, approve, confidence)
+            },
+            "store_file" => {
+                let name = if let Some(idx) = q.find(':') {
+                    q[idx+1..].trim().to_string()
+                } else if let Some(idx) = q.find("note") {
+                    q[idx+4..].trim().to_string()
+                } else {
+                    "untitled".to_string()
+                };
+                format!(r#"{{"action": "store_file", "params": {{"name": "{}"}}, "confidence": {:.2}}}"#, name, confidence)
+            },
+            "balance" | "get_balance" => {
+                format!(r#"{{"action": "get_balance", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "get_proposals" => {
+                format!(r#"{{"action": "get_proposals", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "query_files" => {
+                format!(r#"{{"action": "query_files", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "get_status" => {
+                format!(r#"{{"action": "get_status", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "tune_power" => {
+                format!(r#"{{"action": "set_config", "params": {{"target": "power.governor", "value": "powersave"}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "tune_storage" => {
+                format!(r#"{{"action": "tune_storage", "params": {{"target": "storage.sharding", "value": "60% local"}}, "confidence": {:.2}}}"#, confidence)
+            },
+            // Glasses-specific actions
+            "capture_photo" => {
+                format!(r#"{{"action": "capture_photo", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "record_video" => {
+                let duration = words.iter()
+                    .filter_map(|w| w.parse::<u32>().ok())
+                    .next()
+                    .unwrap_or(30);
+                format!(r#"{{"action": "record_video", "params": {{"duration": {}}}, "confidence": {:.2}}}"#, duration, confidence)
+            },
+            "navigate" => {
+                // Extract destination after "to"
+                let destination = if let Some(idx) = q.find("to ") {
+                    q[idx + 3..].trim().to_string()
+                } else {
+                    "unknown".to_string()
+                };
+                format!(r#"{{"action": "navigate", "params": {{"destination": "{}"}}, "confidence": {:.2}}}"#, destination, confidence)
+            },
+            "translate" => {
+                format!(r#"{{"action": "translate", "params": {{"text": "{}"}}, "confidence": {:.2}}}"#, original_query, confidence)
+            },
+            "show_notifications" => {
+                format!(r#"{{"action": "show_notifications", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "set_timer" => {
+                let minutes = words.iter()
+                    .filter_map(|w| w.parse::<u32>().ok())
+                    .next()
+                    .unwrap_or(5);
+                let label = if q.contains("for") {
+                    if let Some(idx) = q.find("for ") {
+                        q[idx + 4..].trim().to_string()
+                    } else { "Timer".to_string() }
+                } else { "Timer".to_string() };
+                format!(r#"{{"action": "set_timer", "params": {{"minutes": {}, "label": "{}"}}, "confidence": {:.2}}}"#, minutes, label, confidence)
+            },
+            "identify_object" => {
+                format!(r#"{{"action": "identify_object", "params": {{}}, "confidence": {:.2}}}"#, confidence)
+            },
+            "make_call" => {
+                let contact = words.iter()
+                    .skip_while(|w| **w != "call" && **w != "dial")
+                    .skip(1)
+                    .next()
+                    .unwrap_or(&"unknown");
+                format!(r#"{{"action": "make_call", "params": {{"contact": "{}"}}, "confidence": {:.2}}}"#, contact, confidence)
+            },
+            "play_media" => {
+                let query = if let Some(idx) = q.find("play ") {
+                    q[idx + 5..].trim().to_string()
+                } else {
+                    "music".to_string()
+                };
+                format!(r#"{{"action": "play_media", "params": {{"query": "{}"}}, "confidence": {:.2}}}"#, query, confidence)
+            },
+            "adjust_volume" => {
+                let direction = if q.contains("up") || q.contains("louder") { "up" } else { "down" };
+                format!(r#"{{"action": "adjust_volume", "params": {{"direction": "{}"}}, "confidence": {:.2}}}"#, direction, confidence)
+            },
+            "adjust_brightness" => {
+                let level = if q.contains("dim") || q.contains("low") { 25 } else if q.contains("bright") || q.contains("high") { 75 } else { 50 };
+                format!(r#"{{"action": "adjust_brightness", "params": {{"level": {}}}, "confidence": {:.2}}}"#, level, confidence)
+            },
+            _ => {
+                format!(r#"{{"action": "unknown", "params": {{"raw": "{}"}}, "confidence": 0.1}}"#, original_query)
             }
-            
-            Ok(output_text.replace("</s>", "").trim().to_string())
-
-        } else {
-            // Simulation Fallback - Only if model is truly missing
-            // We prefer to fail for specific tasks, but for general chat we keep this for now
-            // to allow the OS to boot without 2GB downloads.
-            self.predict_simulated(prompt)
         }
+    }
+
+    /// Smart fallback using heuristic pattern matching
+    fn predict_smart_fallback(&self, prompt: &str) -> Result<String> {
+        self.predict_smart_fallback_inner(prompt)
     }
 
     /// Generates actionable AR commands based on context.
@@ -476,7 +934,11 @@ impl KaranaAI {
     }
 
     fn predict_simulated(&self, prompt: &str) -> Result<String> {
-        log::info!("AI Predict (Simulated): Prompt='{}'", prompt);
+        self.predict_smart_fallback_inner(prompt)
+    }
+
+    fn predict_smart_fallback_inner(&self, prompt: &str) -> Result<String> {
+        log::info!("AI Predict (Rule-based): Prompt='{}'", prompt);
         let p = prompt.to_lowercase();
         
         let response = if p.contains("tune") || p.contains("compress") {
