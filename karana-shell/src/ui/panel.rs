@@ -11,10 +11,9 @@ impl AdaptivePanel {
         // For Druid Flex, we simulate a vertical stack of floating cards.
         Scroll::new(
             List::new(|| {
-                build_single_panel()
+                build_single_panel().padding(10.0)
             })
             .lens(AppState::active_panels)
-            .spacing(20.0)
         )
         .vertical()
         .expand_width()

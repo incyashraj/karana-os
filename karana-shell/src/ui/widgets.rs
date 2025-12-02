@@ -57,7 +57,7 @@ impl<T: Data> Widget<T> for ZStack<T> {
                 (bc.max().width - size.width) / 2.0,
                 (bc.max().height - size.height) / 2.0
             );
-            child.set_origin(ctx, data, env, origin);
+            child.set_origin(ctx, origin);
         }
         
         // If constraints are infinite, use max_size, otherwise fill
