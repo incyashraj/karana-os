@@ -7,6 +7,11 @@ use lru::LruCache;
 use std::num::NonZeroUsize;
 use crate::chain::Block as ChainBlock;
 use serde::{Serialize, Deserialize};
+use std::fs;
+use std::path::Path;
+
+/// Real Output Directory for Intent Actions
+const REAL_OUTPUT_DIR: &str = "/tmp/karana";
 
 pub struct MerkleTree {
     pub root: Vec<u8>,
@@ -123,8 +128,18 @@ impl KaranaStorage {
         })
     }
 
-    pub fn write(&self, data: &[u8], _context: &str) -> Result<StorageBlob> {
+    pub fn write(&self, data: &[u8], context: &str) -> Result<StorageBlob> {
         let data_str = String::from_utf8_lossy(data).to_string();
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 7.1: REAL FILE OUTPUT
+        // Write to /tmp/karana/<context>.conf for observable results
+        // ═══════════════════════════════════════════════════════════════════
+        fs::create_dir_all(REAL_OUTPUT_DIR)?;
+        let safe_context = context.replace(" ", "_").replace("/", "_");
+        let output_path = Path::new(REAL_OUTPUT_DIR).join(format!("{}.conf", safe_context));
+        fs::write(&output_path, data)?;
+        log::info!("[STORAGE] ✓ Written: {} ({} bytes)", output_path.display(), data.len());
 
         // Atom 3: Use AI to summarize AND Embed
         let prompt = format!("Summarize this data for storage indexing: '{}'", data_str);

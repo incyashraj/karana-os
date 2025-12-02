@@ -1,10 +1,21 @@
 use anyhow::Result;
 use evdev::{Device, EventType};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Phase 7.4: Haptic feedback patterns
+#[derive(Debug, Clone, Copy)]
+pub enum HapticPattern {
+    Success,      // Short double pulse
+    Error,        // Long pulse
+    Notification, // Gentle tap
+    Warning,      // Triple quick pulse
+}
 
 pub struct HapticEngine {
     device: Option<Device>,
     device_path: Option<PathBuf>,
+    pulse_count: AtomicU64,
 }
 
 impl HapticEngine {
@@ -12,6 +23,7 @@ impl HapticEngine {
         let mut engine = Self {
             device: None,
             device_path: None,
+            pulse_count: AtomicU64::new(0),
         };
         engine.scan_and_connect();
         engine
@@ -49,6 +61,25 @@ impl HapticEngine {
         }
     }
 
+    /// Phase 7.4: Play a haptic pattern
+    pub fn play_pattern(&mut self, pattern: HapticPattern) -> Result<String> {
+        self.pulse_count.fetch_add(1, Ordering::Relaxed);
+        let pulse_num = self.pulse_count.load(Ordering::Relaxed);
+        
+        let (desc, duration, intensity) = match pattern {
+            HapticPattern::Success => ("━━ ━━", 100, 25000),
+            HapticPattern::Error => ("━━━━━━━━", 400, 40000),
+            HapticPattern::Notification => ("━", 50, 15000),
+            HapticPattern::Warning => ("━ ━ ━", 80, 30000),
+        };
+        
+        self.vibrate(duration, intensity)?;
+        
+        let feedback = format!("[HAPTIC] #{} {:?} {}", pulse_num, pattern, desc);
+        log::info!("{}", feedback);
+        Ok(feedback)
+    }
+
     pub fn vibrate(&mut self, duration_ms: u16, intensity: u16) -> Result<()> {
         if self.device.is_some() {
             // Real Haptics via evdev
@@ -83,9 +114,10 @@ impl HapticEngine {
     }
     
     pub fn status(&self) -> String {
+        let count = self.pulse_count.load(Ordering::Relaxed);
         match &self.device_path {
-            Some(p) => format!("Active ({:?})", p),
-            None => "Virtual (No HW)".to_string(),
+            Some(p) => format!("Active ({:?}) [{} pulses]", p, count),
+            None => format!("Virtual (No HW) [{} pulses]", count),
         }
     }
 }

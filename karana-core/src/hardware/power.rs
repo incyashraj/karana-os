@@ -64,6 +64,8 @@ impl PowerManager {
 
         // Simulation Logic for Prototype (Fallback)
         if !found_real_battery {
+            // If we are in "DevKit" mode (Desktop), we simulate a battery drain
+            // to help the developer test the UI's reaction to power states.
             if !self.battery.is_charging {
                 let drain = match self.profile {
                     PowerProfile::Performance => 0.5,
@@ -72,6 +74,9 @@ impl PowerManager {
                     PowerProfile::Critical => 0.0,
                 };
                 self.battery.percentage = (self.battery.percentage - drain).max(0.0);
+            } else {
+                // Charge up
+                self.battery.percentage = (self.battery.percentage + 1.0).min(100.0);
             }
         }
 
@@ -96,6 +101,7 @@ impl PowerManager {
 
     pub fn toggle_charging_sim(&mut self) {
         self.battery.is_charging = !self.battery.is_charging;
+        log::info!("Atom 3 (Power): Charging Simulation Toggled: {}", self.battery.is_charging);
     }
     
     pub fn get_status_string(&self) -> String {

@@ -9,6 +9,7 @@ use candle_transformers::generation::LogitsProcessor;
 use tokenizers::{Tokenizer, PaddingParams};
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use std::path::PathBuf;
+use serde::{Serialize, Deserialize};
 
 // TinyLlama 1.1B Chat (Quantized) - ~670MB
 const MODEL_REPO: &str = "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
@@ -19,6 +20,65 @@ const WHISPER_REPO: &str = "openai/whisper-tiny.en";
 
 // BLIP (Image Captioning)
 const BLIP_REPO: &str = "Salesforce/blip-image-captioning-base";
+
+/// Phase 7.2: Structured AI Action Output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AIAction {
+    pub action: String,
+    pub target: String,
+    pub value: String,
+    pub confidence: f32,
+}
+
+impl AIAction {
+    pub fn parse_from_text(text: &str) -> Option<Self> {
+        // Try JSON first
+        if let Ok(action) = serde_json::from_str::<AIAction>(text) {
+            return Some(action);
+        }
+        
+        // Fallback: Parse "action: X, target: Y, value: Z" format
+        let lower = text.to_lowercase();
+        
+        // Heuristic parsing for common patterns
+        if lower.contains("set") || lower.contains("configure") {
+            let action = if lower.contains("governor") || lower.contains("power") {
+                "set_config"
+            } else if lower.contains("shard") || lower.contains("storage") {
+                "tune_storage"
+            } else {
+                "generic_set"
+            };
+            
+            let value = if lower.contains("powersave") || lower.contains("eco") {
+                "powersave"
+            } else if lower.contains("performance") {
+                "performance"
+            } else if lower.contains("balanced") {
+                "balanced"
+            } else {
+                "default"
+            };
+            
+            let target = if lower.contains("battery") || lower.contains("power") {
+                "power.governor"
+            } else if lower.contains("storage") || lower.contains("shard") {
+                "storage.sharding"
+            } else {
+                "system.config"
+            };
+            
+            return Some(AIAction {
+                action: action.to_string(),
+                target: target.to_string(),
+                value: value.to_string(),
+                confidence: 0.75,
+            });
+        }
+        
+        None
+    }
+}
 
 pub struct KaranaAI {
     device: Device,
@@ -466,5 +526,60 @@ impl KaranaAI {
         let prompt = format!("Rate the severity of this system log from 0.0 (safe) to 1.0 (critical): '{}'. Answer with only the number.", event);
         let response = self.predict(&prompt, 10)?;
         response.trim().parse::<f32>().context("Parse score fail").map(|s| s.min(1.0).max(0.0))
+    }
+
+    /// Phase 7.2: Predict an executable action from user intent
+    /// Returns structured AIAction that monad can execute
+    pub fn predict_action(&mut self, intent: &str) -> Result<AIAction> {
+        // First try to get AI prediction
+        let prompt = format!(
+            "Parse this user intent into an action. Respond with JSON: {{\"action\": \"set_config|tune_storage|execute_command\", \"target\": \"config.path\", \"value\": \"value\", \"confidence\": 0.0-1.0}}. Intent: '{}'",
+            intent
+        );
+        
+        let response = self.predict(&prompt, 80)?;
+        log::info!("[AI] Raw prediction: {}", response);
+        
+        // Try to parse as JSON or use heuristics
+        if let Some(action) = AIAction::parse_from_text(&response) {
+            log::info!("[AI] ✓ Parsed action: {:?}", action);
+            return Ok(action);
+        }
+        
+        // Fallback: Use heuristics on the original intent
+        let lower = intent.to_lowercase();
+        
+        let action = if lower.contains("tune") && lower.contains("battery") {
+            AIAction {
+                action: "set_config".to_string(),
+                target: "power.governor".to_string(),
+                value: "powersave".to_string(),
+                confidence: 0.85,
+            }
+        } else if lower.contains("tune") && lower.contains("storage") {
+            AIAction {
+                action: "tune_storage".to_string(),
+                target: "storage.sharding".to_string(),
+                value: "60% local, 40% swarm".to_string(),
+                confidence: 0.80,
+            }
+        } else if lower.contains("optimize") {
+            AIAction {
+                action: "tune_storage".to_string(),
+                target: "storage.compression".to_string(),
+                value: "zstd level=3".to_string(),
+                confidence: 0.75,
+            }
+        } else {
+            AIAction {
+                action: "generic".to_string(),
+                target: "system".to_string(),
+                value: intent.to_string(),
+                confidence: 0.50,
+            }
+        };
+        
+        log::info!("[AI] ✓ Heuristic action: {:?}", action);
+        Ok(action)
     }
 }

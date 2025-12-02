@@ -3,6 +3,7 @@ use crate::storage::StorageBlob;
 use crate::chain::Block as ChainBlock;
 use crate::ai::KaranaAI;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
 use libp2p::{
     gossipsub, mdns, noise, tcp, yamux, SwarmBuilder, Multiaddr,
     kad::{store::MemoryStore, Behaviour as KadBehaviour},
@@ -15,6 +16,39 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use serde::{Serialize, Deserialize};
+
+/// Phase 7.3: Swarm Relay Statistics
+#[derive(Debug, Default)]
+pub struct SwarmStats {
+    pub messages_sent: AtomicU64,
+    pub messages_received: AtomicU64,
+    pub peers_connected: AtomicU64,
+    pub echoes_received: AtomicU64,
+}
+
+impl SwarmStats {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    
+    pub fn summary(&self) -> String {
+        format!(
+            "Swarm: {} sent, {} recv, {} peers, {} echoes",
+            self.messages_sent.load(Ordering::Relaxed),
+            self.messages_received.load(Ordering::Relaxed),
+            self.peers_connected.load(Ordering::Relaxed),
+            self.echoes_received.load(Ordering::Relaxed)
+        )
+    }
+}
+
+/// Phase 7.3: Echo confirmation message
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SwarmEcho {
+    pub message_id: String,
+    pub sender_did: String,
+    pub timestamp: u64,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AIComputeRequest {
@@ -48,10 +82,12 @@ struct KaranaBehaviour {
 
 enum SwarmCmd {
     Broadcast(Vec<u8>),
+    BroadcastWithEcho { data: Vec<u8>, msg_id: String },
     ZkDial { peer: Multiaddr, #[allow(dead_code)] proof: Vec<u8> },
     SendAIRequest(AIComputeRequest),
     SendAIResponse(AIComputeResponse),
     SyncClipboard(ClipboardSync),
+    SendEcho(SwarmEcho),
 }
 
 #[derive(Debug, Clone)]
@@ -61,6 +97,8 @@ pub enum KaranaSwarmEvent {
     AIRequestReceived(AIComputeRequest),
     AIResponseReceived(AIComputeResponse),
     ClipboardReceived(ClipboardSync),
+    EchoReceived(SwarmEcho),
+    PeerConnected(String),
 }
 
 #[derive(Clone)]
@@ -68,10 +106,17 @@ pub struct KaranaSwarm {
     cmd_tx: mpsc::Sender<SwarmCmd>,
     event_rx: Arc<Mutex<mpsc::Receiver<KaranaSwarmEvent>>>,
     ai: Arc<Mutex<KaranaAI>>,
+    pub stats: Arc<SwarmStats>,
+    local_did: Arc<Mutex<String>>,
 }
 
 impl KaranaSwarm {
     pub async fn new(ai: Arc<Mutex<KaranaAI>>, port: u16, peer: Option<String>) -> Result<Self> {
+        let stats = Arc::new(SwarmStats::new());
+        let stats_clone = stats.clone();
+        let local_did = Arc::new(Mutex::new(format!("node-{}", port)));
+        let local_did_clone = local_did.clone();
+        
         let mut swarm = SwarmBuilder::with_new_identity()
             .with_tokio()
             .with_tcp(
@@ -151,10 +196,29 @@ impl KaranaSwarm {
                             }
                         },
                         SwarmEvent::Behaviour(KaranaBehaviourEvent::Gossipsub(gossipsub::Event::Message { propagation_source: peer_id, message_id: id, message })) => {
+                            stats_clone.messages_received.fetch_add(1, Ordering::Relaxed);
                             log::info!("Atom 6 (P2P): Got message: '{}' with id: {} from peer: {:?}", String::from_utf8_lossy(&message.data), id, peer_id);
+                            
+                            // Phase 7.3: Try echo first
+                            if let Ok(echo) = serde_json::from_slice::<SwarmEcho>(&message.data) {
+                                stats_clone.echoes_received.fetch_add(1, Ordering::Relaxed);
+                                log::info!("[SWARM] ✓ Echo received for msg {}", echo.message_id);
+                                let _ = event_tx.send(KaranaSwarmEvent::EchoReceived(echo)).await;
+                                continue;
+                            }
                             
                             // Try to deserialize as Block
                             if let Ok(block) = serde_json::from_slice::<ChainBlock>(&message.data) {
+                                // Send echo back
+                                let echo = SwarmEcho {
+                                    message_id: id.to_string(),
+                                    sender_did: local_did_clone.lock().unwrap().clone(),
+                                    timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                                };
+                                let topic = gossipsub::IdentTopic::new("karana-blocks");
+                                if let Ok(echo_data) = serde_json::to_vec(&echo) {
+                                    let _ = swarm.behaviour_mut().gossipsub.publish(topic, echo_data);
+                                }
                                 let _ = event_tx.send(KaranaSwarmEvent::BlockReceived(block)).await;
                             } else if let Ok(req) = serde_json::from_slice::<AIComputeRequest>(&message.data) {
                                 log::info!("Atom 6 (P2P): Received AI Compute Request: {}", req.request_id);
@@ -169,6 +233,15 @@ impl KaranaSwarm {
                                 let _ = event_tx.send(KaranaSwarmEvent::GenericMessage(String::from_utf8_lossy(&message.data).to_string())).await;
                             }
                         },
+                        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                            stats_clone.peers_connected.fetch_add(1, Ordering::Relaxed);
+                            log::info!("[SWARM] ✓ Peer connected: {:?}", peer_id);
+                            let _ = event_tx.send(KaranaSwarmEvent::PeerConnected(peer_id.to_string())).await;
+                        },
+                        SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                            stats_clone.peers_connected.fetch_sub(1, Ordering::Relaxed);
+                            log::info!("[SWARM] ✗ Peer disconnected: {:?}", peer_id);
+                        },
                         SwarmEvent::Behaviour(KaranaBehaviourEvent::Kad(_event)) => {
                              // log::info!("Atom 6 (P2P): DHT Event: {:?}", event);
                         },
@@ -177,9 +250,25 @@ impl KaranaSwarm {
                     Some(cmd) = cmd_rx.recv() => {
                         match cmd {
                             SwarmCmd::Broadcast(data) => {
+                                stats_clone.messages_sent.fetch_add(1, Ordering::Relaxed);
                                 let topic = gossipsub::IdentTopic::new("karana-blocks");
                                 if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
                                     log::info!("Atom 6 (P2P): Publish error: {:?}", e);
+                                }
+                            },
+                            SwarmCmd::BroadcastWithEcho { data, msg_id } => {
+                                stats_clone.messages_sent.fetch_add(1, Ordering::Relaxed);
+                                let topic = gossipsub::IdentTopic::new("karana-blocks");
+                                if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic, data) {
+                                    log::info!("Atom 6 (P2P): Publish error: {:?}", e);
+                                } else {
+                                    log::info!("[SWARM] ✓ Broadcast {} - awaiting echoes", msg_id);
+                                }
+                            },
+                            SwarmCmd::SendEcho(echo) => {
+                                let topic = gossipsub::IdentTopic::new("karana-blocks");
+                                if let Ok(data) = serde_json::to_vec(&echo) {
+                                    let _ = swarm.behaviour_mut().gossipsub.publish(topic, data);
                                 }
                             },
                             SwarmCmd::SyncClipboard(clip) => {
@@ -221,7 +310,11 @@ impl KaranaSwarm {
             }
         });
 
-        Ok(Self { cmd_tx, event_rx: Arc::new(Mutex::new(event_rx)), ai })
+        Ok(Self { cmd_tx, event_rx: Arc::new(Mutex::new(event_rx)), ai, stats, local_did })
+    }
+
+    pub fn set_local_did(&self, did: &str) {
+        *self.local_did.lock().unwrap() = did.to_string();
     }
 
     pub fn poll_event(&self) -> Option<KaranaSwarmEvent> {
@@ -250,10 +343,19 @@ impl KaranaSwarm {
     }
 
     pub async fn broadcast_chain_block(&self, block: &ChainBlock) -> Result<()> {
+        let msg_id = format!("blk-{}", block.header.height);
         let data = serde_json::to_vec(block)?;
-        self.cmd_tx.send(SwarmCmd::Broadcast(data)).await?;
-        log::info!("Atom 6 (P2P): Broadcasted Chain Block #{} via Gossipsub.", block.header.height);
+        self.cmd_tx.send(SwarmCmd::BroadcastWithEcho { data, msg_id: msg_id.clone() }).await?;
+        log::info!("[SWARM] ✓ Broadcasted Block #{} ({})", block.header.height, self.stats.summary());
         Ok(())
+    }
+
+    /// Phase 7.3: Broadcast with echo confirmation - returns message ID for tracking
+    pub async fn broadcast_with_tracking(&self, data: Vec<u8>, label: &str) -> Result<String> {
+        let msg_id = format!("{}-{}", label, uuid::Uuid::new_v4().to_string()[..8].to_string());
+        self.cmd_tx.send(SwarmCmd::BroadcastWithEcho { data, msg_id: msg_id.clone() }).await?;
+        log::info!("[SWARM] ✓ Broadcast {} - {}", msg_id, self.stats.summary());
+        Ok(msg_id)
     }
 
     pub async fn broadcast_attestation(&self, path: &str, proof: &[u8]) -> Result<()> {

@@ -95,6 +95,13 @@ We deconstructed the OS into **Atoms**—indivisible, verifiable units of realit
 *   **GUI Shell**: Implemented `karana-shell` with Druid (Orb, Panels, Nudge).
 *   **IPC Layer**: TCP bridge between Core and Shell.
 
+## 🕶️ Hardware & Vision
+Kāraṇa OS is designed for a "Split-Architecture" wearable future.
+*   **Display**: Smart Glasses (XREAL/Rokid) acting as a dumb terminal.
+*   **Compute**: A belt-worn "Puck" (Orange Pi 5 / RK3588) running the Core.
+
+👉 **[Read the Full Hardware Plan](./HARDWARE_PLAN.md)** for recommended dev kits and the roadmap to a "State of the Art" device.
+
 ---
 
 *"We do not build the OS to control the machine. We build the OS to free the mind."*

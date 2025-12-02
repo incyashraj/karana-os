@@ -10,6 +10,13 @@ pub enum TransactionData {
     Stake { amount: u128 },
     Propose { title: String, description: String },
     Vote { proposal_id: u64, approve: bool },
+    /// Phase 7.5: Intent attestation with ZK proof
+    IntentAttestation { 
+        intent: String, 
+        proof_hash: String,  // Hash of ZK proof
+        result_hash: String, // Hash of action result
+        timestamp: u64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,8 +122,36 @@ impl Blockchain {
                 TransactionData::Vote { proposal_id, approve } => {
                     self.gov.lock().unwrap().vote(*proposal_id, &tx.sender, *approve)?;
                 }
+                TransactionData::IntentAttestation { intent, proof_hash, result_hash, timestamp } => {
+                    // Phase 7.5: Record intent completion on chain
+                    log::info!("[CHAIN] ✓ Intent attested: '{}' at {} [proof: {}..., result: {}...]", 
+                        intent, timestamp, &proof_hash[..8.min(proof_hash.len())], &result_hash[..8.min(result_hash.len())]);
+                    // In a full implementation, this would update a state trie
+                }
             }
         }
         Ok(())
+    }
+
+    /// Phase 7.5: Create an attestation transaction for an intent completion
+    pub fn attest_intent(&self, sender: &str, intent: &str, proof: &[u8], result: &str) -> Transaction {
+        let proof_hash = hex::encode(Sha256::digest(proof));
+        let result_hash = hex::encode(Sha256::digest(result.as_bytes()));
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        Transaction {
+            sender: sender.to_string(),
+            data: TransactionData::IntentAttestation {
+                intent: intent.to_string(),
+                proof_hash,
+                result_hash,
+                timestamp,
+            },
+            signature: "attested".to_string(),
+            nonce: timestamp,
+        }
     }
 }

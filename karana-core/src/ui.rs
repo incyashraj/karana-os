@@ -51,6 +51,9 @@ pub struct UiState {
     pub ar_context: Option<String>,
     pub ar_suggestions: Vec<String>,
     pub active_did: String,
+    pub gaze_sim_active: bool,
+    pub last_real_output: Option<String>,  // Phase 7.4: Real file output
+    pub swarm_stats: String,                // Phase 7.3: Swarm statistics
 }
 
 pub struct KaranaUI {
@@ -92,6 +95,9 @@ impl KaranaUI {
             ar_context: None,
             ar_suggestions: vec![],
             active_did: "Guest".to_string(),
+            gaze_sim_active: false,
+            last_real_output: None,
+            swarm_stats: "Swarm: Initializing...".to_string(),
         }));
 
         let (tx, rx) = mpsc::channel();
@@ -401,6 +407,9 @@ impl KaranaUI {
                                .trim().to_string();
              
              // Check for External App Launch (Real Desktop Integration)
+             // NOTE: In the final "Smart Glass" vision, this would trigger a "Remote App Stream"
+             // from the user's paired Compute Node (PC/Phone), rather than launching locally on the glass.
+             // For Development/Simulation, we launch it on the host to verify the intent pipeline.
              let external_map = vec![
                  ("vs code", "code"),
                  ("vscode", "code"),
@@ -419,7 +428,7 @@ impl KaranaUI {
              if let Some((_, cmd)) = external_cmd {
                  // Attempt to launch real process
                  match Command::new(cmd).spawn() {
-                     Ok(_) => return Ok(format!("Launched External App: {}", app_id)),
+                     Ok(_) => return Ok(format!("Launched External App: {} (Simulating Remote Stream)", app_id)),
                      Err(e) => {
                          log::warn!("Failed to launch external app '{}': {}", cmd, e);
                          // Fallthrough to internal simulation if external fails
@@ -507,6 +516,10 @@ impl KaranaUI {
                  Ok(msg) => msg,
                  Err(e) => format!("Hardware Error: {}", e),
              }
+        } else if input == "simulate gaze" {
+            let mut state = self.state.lock().unwrap();
+            state.gaze_sim_active = !state.gaze_sim_active;
+            format!("Gaze Simulation: {}", if state.gaze_sim_active { "ENABLED" } else { "DISABLED" })
         } else {
             // Step 2: AI Parse & Render (Symbiotic Canvas)
             let prompt = format!("Describe a UI view for this user intent: '{}'. Keep it short.", input);
@@ -664,7 +677,14 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
 
         // Update Input Status every 100ms
         if last_input_update.elapsed() >= std::time::Duration::from_millis(100) {
-             let input = hardware.input.lock().unwrap();
+             let mut input = hardware.input.lock().unwrap();
+             
+             // Check simulation flag
+             let sim_active = if let Ok(s) = state.lock() { s.gaze_sim_active } else { false };
+             if sim_active {
+                 input.simulate_random_gaze();
+             }
+
              // Real Gaze is now updated via Mouse Events (see below)
              let g_status = format!("Gaze: ({:.2}, {:.2})", input.last_gaze.0, input.last_gaze.1);
              if let Ok(mut s) = state.lock() {
@@ -713,7 +733,16 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 let launcher_text = "1. Terminal\n2. Files\n3. Bazaar\n4. AI Assistant\n5. Governance";
                 compositor.add_widget_sized("launcher", launcher_text, 0.55, 0.15, 0.4, 0.3);
 
-                let activity_text = format!("Last Intent: {}\nContext: {}", intent, view);
+                // Phase 7.4: Show real output files if available
+                let real_output = std::fs::read_to_string("/tmp/karana/power_governor.conf")
+                    .or_else(|_| std::fs::read_to_string("/tmp/karana/storage_tuning.conf"))
+                    .unwrap_or_else(|_| format!("Last Intent: {}\nContext: {}", intent, view));
+                
+                let activity_text = if real_output.contains("Karana") {
+                    format!("[REAL OUTPUT]\n{}", real_output.lines().take(5).collect::<Vec<_>>().join("\n"))
+                } else {
+                    format!("Last Intent: {}\nContext: {}", intent, view)
+                };
                 compositor.add_widget_sized("activity", &activity_text, 0.05, 0.5, 0.9, 0.25);
             }
 

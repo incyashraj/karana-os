@@ -4,15 +4,55 @@ use ark_bls12_381::{Bls12_381};
 use ark_snark::SNARK;
 use ark_std::rand::thread_rng;
 use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
-use std::sync::OnceLock;
+use std::sync::{OnceLock, Mutex};
 use std::fs::File;
 use std::path::Path;
+use std::collections::VecDeque;
 
 pub mod storage_proof;
 use storage_proof::StorageCircuit;
 
+/// Phase 7.6: Proof batch for efficient proving
+#[derive(Debug)]
+pub struct ProofBatch {
+    pub items: VecDeque<(Vec<u8>, [u8; 32])>, // (input, expected_hash)
+    pub max_size: usize,
+}
+
+impl ProofBatch {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            items: VecDeque::new(),
+            max_size,
+        }
+    }
+    
+    pub fn add(&mut self, input: Vec<u8>, expected_hash: [u8; 32]) {
+        self.items.push_back((input, expected_hash));
+        if self.items.len() > self.max_size {
+            self.items.pop_front();
+        }
+    }
+    
+    pub fn is_ready(&self) -> bool {
+        self.items.len() >= self.max_size
+    }
+    
+    pub fn flush(&mut self) -> Vec<(Vec<u8>, [u8; 32])> {
+        self.items.drain(..).collect()
+    }
+}
+
 // Global keys for the storage circuit
 static ZK_KEYS: OnceLock<(ProvingKey<Bls12_381>, PreparedVerifyingKey<Bls12_381>)> = OnceLock::new();
+
+// Global proof batch
+static PROOF_BATCH: OnceLock<Mutex<ProofBatch>> = OnceLock::new();
+
+/// Phase 7.6: Get or initialize the proof batch
+fn get_proof_batch() -> &'static Mutex<ProofBatch> {
+    PROOF_BATCH.get_or_init(|| Mutex::new(ProofBatch::new(5)))
+}
 
 pub fn setup_zk() -> Result<()> {
     let key_path = Path::new("zk_keys_storage.bin");
@@ -111,6 +151,50 @@ pub fn verify_proof(proof_bytes: &[u8], expected_hash: [u8; 32]) -> bool {
         &public_inputs,
         &proof
     ).unwrap_or(false)
+}
+
+/// Phase 7.6: Queue a proof for batch processing
+pub fn queue_proof(input: &[u8], expected_hash: [u8; 32]) {
+    let batch = get_proof_batch();
+    if let Ok(mut b) = batch.lock() {
+        b.add(input.to_vec(), expected_hash);
+        log::info!("[ZK] ✓ Proof queued ({}/{} in batch)", b.items.len(), b.max_size);
+    }
+}
+
+/// Phase 7.6: Prove all queued items (batch proving)
+pub fn prove_batch() -> Result<Vec<Vec<u8>>> {
+    let batch = get_proof_batch();
+    let items = {
+        let mut b = batch.lock().unwrap();
+        b.flush()
+    };
+    
+    if items.is_empty() {
+        return Ok(vec![]);
+    }
+    
+    log::info!("[ZK] ✓ Batch proving {} items...", items.len());
+    let start = std::time::Instant::now();
+    
+    let mut proofs = Vec::new();
+    for (input, hash) in items {
+        let proof = prove_data_hash(&input, hash)?;
+        proofs.push(proof);
+    }
+    
+    log::info!("[ZK] ✓ Batch complete: {} proofs in {:?}", proofs.len(), start.elapsed());
+    Ok(proofs)
+}
+
+/// Phase 7.6: Get batch status
+pub fn get_batch_status() -> (usize, usize) {
+    let batch = get_proof_batch();
+    if let Ok(b) = batch.lock() {
+        (b.items.len(), b.max_size)
+    } else {
+        (0, 0)
+    }
 }
 
 // Re-export helper
