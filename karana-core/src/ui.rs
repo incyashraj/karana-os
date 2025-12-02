@@ -400,6 +400,33 @@ impl KaranaUI {
                                .replace("use", "")
                                .trim().to_string();
              
+             // Check for External App Launch (Real Desktop Integration)
+             let external_map = vec![
+                 ("vs code", "code"),
+                 ("vscode", "code"),
+                 ("code", "code"),
+                 ("firefox", "firefox"),
+                 ("chrome", "google-chrome"),
+                 ("chromium", "chromium"),
+                 ("spotify", "spotify"),
+                 ("discord", "discord"),
+                 ("terminal", "gnome-terminal"), // Fallback for external terminal
+             ];
+
+             let lower_id = app_id.to_lowercase();
+             let external_cmd = external_map.iter().find(|(key, _)| lower_id.contains(key));
+
+             if let Some((_, cmd)) = external_cmd {
+                 // Attempt to launch real process
+                 match Command::new(cmd).spawn() {
+                     Ok(_) => return Ok(format!("Launched External App: {}", app_id)),
+                     Err(e) => {
+                         log::warn!("Failed to launch external app '{}': {}", cmd, e);
+                         // Fallthrough to internal simulation if external fails
+                     }
+                 }
+             }
+
              let mut state = self.state.lock().unwrap();
              state.active_app = Some(app_id.clone());
 
