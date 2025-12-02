@@ -1,5 +1,5 @@
 use druid::{Widget, WidgetExt, EventCtx, Event, Env, RenderContext, Color, LinearGradient, UnitPoint};
-use druid::widget::{Painter, Controller, Flex, TextBox};
+use druid::widget::{Painter, Controller};
 use crate::state::AppState;
 use crate::ui::theme;
 
@@ -11,7 +11,7 @@ impl IntentOrb {
         let orb_painter = Painter::new(|ctx, data: &AppState, _env| {
             let bounds = ctx.size().to_rect();
             let center = bounds.center();
-            let radius = 50.0;
+            let radius = bounds.width().min(bounds.height()) / 2.0 - 10.0;
 
             // Neural Pulse Effect (Simulated via time)
             let time = std::time::SystemTime::now()
@@ -25,17 +25,17 @@ impl IntentOrb {
                 (time * 0.001).sin() * 2.0
             };
 
-            // Gradient Fill
+            // Gradient Fill (Cyan to Green)
             let gradient = LinearGradient::new(
                 UnitPoint::TOP_LEFT,
                 UnitPoint::BOTTOM_RIGHT,
-                (theme::NEURAL_BLUE_START, theme::NEURAL_BLUE_END),
+                (theme::HUD_CYAN, theme::HUD_GREEN),
             );
 
             // Outer Glow (Haptic Ring)
             ctx.fill(
-                druid::kurbo::Circle::new(center, radius + pulse + 10.0),
-                &Color::rgba8(0, 100, 255, 30)
+                druid::kurbo::Circle::new(center, radius + pulse),
+                &Color::rgba8(0, 255, 255, 50)
             );
 
             // Core Orb
@@ -43,27 +43,12 @@ impl IntentOrb {
             
             // Status Indicator (Mic)
             if data.voice_listening {
-                ctx.fill(druid::kurbo::Circle::new(center, 10.0), &theme::ALERT_RED);
+                ctx.fill(druid::kurbo::Circle::new(center, radius * 0.3), &theme::HUD_RED);
             }
         });
 
-        // Input Field Overlay
-        let input = TextBox::new()
-            .with_placeholder("Intent...")
-            .with_text_size(14.0)
-            .lens(AppState::intent_input)
-            .fix_width(120.0)
-            .center();
-
-        // Composition
-        Flex::column()
-            .with_child(
-                orb_painter
-                    .fix_size(120.0, 120.0)
-                    .controller(OrbController)
-            )
-            .with_spacer(10.0)
-            .with_child(input)
+        // Just the Orb, no text box
+        orb_painter.controller(OrbController)
     }
 }
 

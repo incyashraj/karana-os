@@ -1,13 +1,11 @@
 use druid::{Color, Env, Key, FontDescriptor, FontFamily};
 
-// --- Color Palette (Neural Void) ---
-pub const VOID_BLACK: Color = Color::rgb8(0, 0, 0);
-pub const NEURAL_BLUE_START: Color = Color::rgb8(0, 30, 60);
-pub const NEURAL_BLUE_END: Color = Color::rgb8(75, 0, 130);
-pub const SHARD_CRYSTAL: Color = Color::rgb8(224, 247, 250); // #E0F7FA
-pub const SHARD_GLOW: Color = Color::rgb8(0, 188, 212);      // #00BCD4
-pub const ALERT_RED: Color = Color::rgb8(255, 23, 68);       // #FF1744
-pub const TEXT_GRAY: Color = Color::rgb8(176, 190, 197);     // #B0BEC5
+// --- Color Palette (AR HUD) ---
+pub const VOID_BLACK: Color = Color::rgb8(0, 0, 0); // Keep black for contrast, but imagine it's transparent
+pub const HUD_CYAN: Color = Color::rgb8(0, 255, 255);      // #00FFFF - Primary HUD Color
+pub const HUD_GREEN: Color = Color::rgb8(0, 255, 0);       // #00FF00 - Success/Active
+pub const HUD_RED: Color = Color::rgb8(255, 50, 50);       // #FF3232 - Alert
+pub const HUD_DIM: Color = Color::rgba8(0, 255, 255, 100); // Dimmed Cyan for inactive elements
 
 // --- Keys ---
 pub const BACKGROUND: Key<Color> = Key::new("karana.background");
@@ -23,19 +21,21 @@ pub const FONT_CODE: Key<FontDescriptor> = Key::new("karana.font.code");
 pub fn configure_env(env: &mut Env, _data: &crate::AppState) {
     // Colors
     env.set(BACKGROUND, VOID_BLACK);
-    env.set(FOREGROUND, SHARD_CRYSTAL);
-    env.set(ACCENT, SHARD_GLOW);
-    env.set(SHARD_BG, Color::rgba8(20, 20, 30, 200)); // Semi-transparent panel bg
+    env.set(FOREGROUND, HUD_CYAN);
+    env.set(ACCENT, HUD_GREEN);
+    env.set(SHARD_BG, Color::rgba8(0, 20, 20, 200)); // Dark Cyan tint
 
     // Druid Defaults
     env.set(druid::theme::WINDOW_BACKGROUND_COLOR, VOID_BLACK);
-    env.set(druid::theme::TEXT_COLOR, SHARD_CRYSTAL);
-    env.set(druid::theme::CURSOR_COLOR, SHARD_GLOW);
-    env.set(druid::theme::BUTTON_DARK, NEURAL_BLUE_START);
-    env.set(druid::theme::BUTTON_LIGHT, NEURAL_BLUE_END);
+    env.set(druid::theme::TEXT_COLOR, HUD_CYAN);
+    env.set(druid::theme::CURSOR_COLOR, HUD_GREEN);
+    env.set(druid::theme::BUTTON_DARK, Color::rgba8(0, 50, 50, 100));
+    env.set(druid::theme::BUTTON_LIGHT, Color::rgba8(0, 100, 100, 100));
+    env.set(druid::theme::TEXTBOX_BORDER_RADIUS, 0.0); // Sharp corners for AR
+    env.set(druid::theme::TEXTBOX_BORDER_WIDTH, 1.0);
 
-    // Fonts (Simulated mapping to system fonts)
-    env.set(FONT_HEADER, FontDescriptor::new(FontFamily::SANS_SERIF).with_size(24.0).with_weight(druid::FontWeight::BOLD));
-    env.set(FONT_BODY, FontDescriptor::new(FontFamily::SANS_SERIF).with_size(14.0));
+    // Fonts (Monospace for HUD feel)
+    env.set(FONT_HEADER, FontDescriptor::new(FontFamily::MONOSPACE).with_size(20.0).with_weight(druid::FontWeight::BOLD));
+    env.set(FONT_BODY, FontDescriptor::new(FontFamily::MONOSPACE).with_size(14.0));
     env.set(FONT_CODE, FontDescriptor::new(FontFamily::MONOSPACE).with_size(12.0));
 }

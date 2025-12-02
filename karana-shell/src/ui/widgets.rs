@@ -1,6 +1,6 @@
 use druid::{
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    Size, UpdateCtx, Widget, WidgetExt, Point, WidgetPod
+    Size, UpdateCtx, Widget, WidgetExt, Point, WidgetPod, Color
 };
 use druid::widget::{Flex, Label, TextBox, Button};
 use crate::state::{AppState, PanelData};
@@ -77,12 +77,13 @@ impl<T: Data> Widget<T> for ZStack<T> {
 
 pub fn build_intent_bar() -> impl Widget<AppState> {
     let input = TextBox::new()
-        .with_placeholder("Express your intent...")
-        .with_text_size(18.0)
+        .with_placeholder(">_")
+        .with_text_size(16.0)
         .lens(AppState::intent_input)
         .expand_width();
 
-    let execute_btn = Button::new("Forge")
+    // Minimal "Execute" arrow, styled as part of the HUD
+    let execute_btn = Button::new(">>")
         .on_click(|_ctx, data: &mut AppState, _env| {
             data.is_processing = true;
             
@@ -123,17 +124,15 @@ pub fn build_intent_bar() -> impl Widget<AppState> {
 
     Flex::row()
         .with_flex_child(input, 1.0)
-        .with_spacer(10.0)
         .with_child(execute_btn)
-        .padding(10.0)
-        .background(theme::NEURAL_BLUE_START)
-        .rounded(8.0)
-        .border(theme::SHARD_GLOW, 1.0)
+        .padding(5.0)
+        .background(Color::rgba8(0, 20, 20, 150))
+        .border(theme::HUD_CYAN, 1.0) // Thin HUD border
 }
 
 pub fn build_status_bar() -> impl Widget<AppState> {
-    Label::new(|data: &AppState, _env: &_| data.system_status.clone())
-        .with_text_size(12.0)
-        .with_text_color(theme::TEXT_GRAY)
-        .padding(5.0)
+    Label::new(|data: &AppState, _env: &_| format!("[SYS] {}", data.system_status))
+        .with_text_size(10.0)
+        .with_text_color(theme::HUD_DIM)
+        .padding(2.0)
 }
