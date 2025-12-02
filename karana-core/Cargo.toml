@@ -2,6 +2,7 @@
 name = "karana-core"
 version = "0.1.0"
 edition = "2024"
+default-run = "karana-core"
 
 [dependencies]
 ark-bls12-381 = "0.5.0"

@@ -16,6 +16,7 @@ use crate::chain::{Blockchain, Transaction, TransactionData, Block};
 use crate::state::KaranaPersist;
 use crate::hardware::KaranaHardware;
 use crate::identity::KaranaIdentity;
+use crate::ipc;
 use alloy_primitives::U256;
 
 /// The Monad: Weaves atoms into sovereign flow
@@ -144,6 +145,12 @@ impl KaranaMonad {
         }
 
         log::info!("=== SYSTEM IGNITION SEQUENCE STARTED ===");
+
+        // Start IPC Server (Phase 8: Shell Integration)
+        let ipc_tx = self.ui.get_intent_sender();
+        if let Err(e) = ipc::start_ipc_server(9000, ipc_tx).await {
+            log::error!("Failed to start IPC Server: {}", e);
+        }
 
         if std::env::var("KARANA_CHROOT").is_ok() {
             log::info!("Ignited in Sovereign Chroot – Fabric Isolated");

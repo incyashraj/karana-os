@@ -63,6 +63,7 @@ pub struct KaranaUI {
     bundle: AppBundle,
     state: Arc<Mutex<UiState>>,
     intent_rx: Mutex<mpsc::Receiver<String>>,
+    intent_tx: mpsc::Sender<String>,
     hardware: Arc<crate::hardware::KaranaHardware>,
     identity: Arc<Mutex<KaranaIdentity>>,
     compositor: Arc<ARCompositor>,
@@ -99,10 +100,11 @@ impl KaranaUI {
         let state_clone = state.clone();
         let hw_clone = hardware.clone();
         let comp_clone = compositor.clone();
+        let tx_tui = tx.clone();
         
         if std::env::var("NO_TUI").is_err() {
             std::thread::spawn(move || {
-                if let Err(e) = run_tui(state_clone, tx, hw_clone, comp_clone) {
+                if let Err(e) = run_tui(state_clone, tx_tui, hw_clone, comp_clone) {
                     log::error!("TUI Error: {}", e);
                 }
             });
@@ -119,10 +121,15 @@ impl KaranaUI {
             bundle,
             state,
             intent_rx: Mutex::new(rx),
+            intent_tx: tx,
             hardware,
             identity,
             compositor,
         })
+    }
+
+    pub fn get_intent_sender(&self) -> mpsc::Sender<String> {
+        self.intent_tx.clone()
     }
 
     pub fn poll_intent(&self) -> Option<String> {
@@ -659,11 +666,17 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 (s.balance, s.block_height, s.current_view.clone(), s.last_intent.clone(), s.active_app.clone(), s.app_output.clone(), s.power_status.clone(), s.gaze_status.clone(), s.ar_context.clone(), s.ar_suggestions.clone(), s.active_did.clone())
             };
 
+            let (gaze_x, gaze_y) = {
+                let input = hardware.input.lock().unwrap();
+                input.last_gaze
+            };
+
             // Update Compositor HUD
             compositor.update_hud(
                 &format!("H: #{}", height),
                 &power,
-                &format!("User: {}", did)
+                &format!("User: {}", did),
+                (gaze_x, gaze_y)
             );
 
             // 1. Header
@@ -693,26 +706,29 @@ fn run_tui(state: Arc<Mutex<UiState>>, intent_tx: mpsc::Sender<String>, hardware
                 hud.push_str("\n(Type suggestion to execute)");
                 hud
             } else {
-                // Dashboard View
-                let mut dashboard = String::new();
-                dashboard.push_str("Welcome to Kāraṇa OS. The Sovereign AI-Native OS.\n\n");
-                dashboard.push_str("[ System Status ]\n");
-                dashboard.push_str(&format!("- Network: Connected (Swarm Active)\n"));
-                dashboard.push_str(&format!("- Consensus: Proof-of-Storage (Height #{})\n", height));
-                dashboard.push_str(&format!("- Identity: {} (Verified)\n\n", did));
+                // Dashboard View (AR Compositor)
+                {
+                    let mut scene = compositor.scene.lock().unwrap();
+                    scene.clear_apps();
+                }
+
+                let status_text = format!("Network: Swarm Active\nConsensus: Height #{}\nIdentity: {}", height, did);
+                compositor.add_widget_sized("sys_status", &status_text, 0.05, 0.1, 0.4, 0.25);
+
+                let launcher_text = "1. Terminal\n2. Files\n3. Bazaar\n4. AI Assistant\n5. Governance";
+                compositor.add_widget_sized("launcher", launcher_text, 0.5, 0.1, 0.4, 0.3);
+
+                let activity_text = format!("Last Intent: {}\nContext: {}", intent, view);
+                compositor.add_widget_sized("activity", &activity_text, 0.05, 0.5, 0.85, 0.2);
+
+                // Render to fit inside the Paragraph's borders
+                let w = (chunks[1].width.saturating_sub(2)) as usize;
+                let h = (chunks[1].height.saturating_sub(2)) as usize;
                 
-                dashboard.push_str("[ App Launcher ]\n");
-                dashboard.push_str("1. Terminal (run terminal)\n");
-                dashboard.push_str("2. File Manager (run files)\n");
-                dashboard.push_str("3. Bazaar (search app <query>)\n");
-                dashboard.push_str("4. AI Assistant (analyze <image> / transcribe <audio>)\n");
-                dashboard.push_str("5. Governance (vote <id>)\n\n");
-                
-                dashboard.push_str("[ Recent Activity ]\n");
-                dashboard.push_str(&format!("- Last Intent: {}\n", intent));
-                dashboard.push_str(&format!("- View Context: {}\n", view));
-                
-                dashboard
+                match compositor.render(w, h) {
+                    Ok(s) => s,
+                    Err(e) => format!("Render Error: {}", e),
+                }
             };
 
             let output = Paragraph::new(content)

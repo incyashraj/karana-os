@@ -17,3 +17,4 @@ pub mod pkg;
 pub mod state;
 pub mod hardware;
 pub mod identity;
+pub mod ipc;
