@@ -1,6 +1,5 @@
 use anyhow::Result;
 use crate::zk::prove_data_hash;
-use sha2::{Sha256, Digest};
 
 pub struct KaranaPersist {
     #[allow(dead_code)]

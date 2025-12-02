@@ -1,4 +1,4 @@
-use ark_groth16::{Groth16, ProvingKey, prepare_verifying_key, PreparedVerifyingKey};
+use ark_groth16::{Groth16, prepare_verifying_key};
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_snark::SNARK;
 use ark_ff::PrimeField;

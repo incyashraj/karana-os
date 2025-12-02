@@ -100,7 +100,7 @@ impl KaranaBoot {
         // or we check if it matches the input.
         
         let path_bytes = chosen_path.as_bytes().to_vec();
-        let path_sum: u64 = path_bytes.iter().map(|&b| b as u64).sum();
+        let _path_sum: u64 = path_bytes.iter().map(|&b| b as u64).sum();
         
         // If the input genesis_hash_val doesn't match, the proof generation is valid for the *actual* sum,
         // but verification would fail against the input. 
