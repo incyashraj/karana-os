@@ -14,6 +14,9 @@ pub struct AppState {
     // DAO/Governance State
     pub dao_proposal_active: bool,
     pub dao_proposal_text: String,
+    // AR/VR State
+    pub ar_mode: bool,
+    pub voice_listening: bool,
 }
 
 #[derive(Clone, Data, Lens)]
@@ -24,6 +27,10 @@ pub struct PanelData {
     pub panel_type: String, // "graph", "list", "code"
     pub is_verified: bool,
     pub proof_hash: String,
+    // Spatial Layout
+    pub x: f64,
+    pub y: f64,
+    pub z_index: i32,
 }
 
 impl AppState {
@@ -36,6 +43,8 @@ impl AppState {
             client: Arc::new(KaranaClient::new()),
             dao_proposal_active: false,
             dao_proposal_text: String::new(),
+            ar_mode: false,
+            voice_listening: false,
         }
     }
 }

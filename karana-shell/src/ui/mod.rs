@@ -5,7 +5,7 @@ pub mod panel;
 pub mod nudge;
 
 use druid::{Widget, WidgetExt};
-use druid::widget::{Flex, Align, Split};
+use druid::widget::{Flex, Align};
 use crate::state::AppState;
 
 pub fn build_root_ui() -> impl Widget<AppState> {
@@ -15,22 +15,39 @@ pub fn build_root_ui() -> impl Widget<AppState> {
     let orb = orb::IntentOrb::new();
     let nudge = nudge::DaoNudge::new();
 
-    let main_layout = Flex::column()
-        .with_child(
-            Flex::row()
-                .with_child(orb.padding(10.0))
-                .with_flex_child(intent_bar, 1.0)
-                .padding(20.0)
-        )
-        .with_flex_child(panels, 1.0)
-        .with_child(Align::right(status_bar));
+    // Layer 1: Panels (Background/Workspace)
+    // We wrap panels in a Flex to ensure they take up space properly if needed, 
+    // but AdaptivePanel should handle its own layout.
+    let workspace_layer = Flex::column()
+        .with_flex_child(panels, 1.0);
 
-    // Overlay Nudge on top (using Z-stack simulation via container if Druid supported it natively easily, 
-    // but here we'll just append it for simplicity or use a specialized layout in real impl)
-    // For this stub, we put it at the bottom floating.
-    
-    Flex::column()
-        .with_flex_child(main_layout, 1.0)
-        .with_child(nudge)
+    // Layer 2: HUD (Orb + Intent Bar + Status)
+    // Positioned at the bottom
+    let hud_layer = Align::centered(
+        Flex::column()
+            .with_child(
+                Flex::row()
+                    .with_child(orb)
+                    .with_spacer(20.0)
+                    .with_child(intent_bar.fix_width(400.0))
+            )
+            .with_spacer(10.0)
+            .with_child(status_bar)
+            .padding(20.0)
+    );
+
+    // Layer 3: Notifications / Nudges
+    // Positioned at the top-right or center-top
+    let overlay_layer = Align::right(
+        Align::top(
+            nudge.padding(20.0)
+        )
+    );
+
+    // Root Z-Stack
+    widgets::ZStack::new()
+        .with_child(workspace_layer) // Bottom
+        .with_child(hud_layer)       // Middle
+        .with_child(overlay_layer)   // Top
         .background(theme::BACKGROUND)
 }

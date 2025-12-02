@@ -1,7 +1,79 @@
-use druid::widget::{Flex, Label, TextBox, Button, Padding};
-use druid::{Widget, WidgetExt, Color};
+use druid::{
+    BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
+    Size, UpdateCtx, Widget, WidgetExt, Color, Point, Rect
+};
+use druid::widget::{Flex, Label, TextBox, Button};
 use crate::state::{AppState, PanelData};
 use crate::ui::theme;
+
+pub struct ZStack<T> {
+    children: Vec<Box<dyn Widget<T>>>,
+}
+
+impl<T: Data> ZStack<T> {
+    pub fn new() -> Self {
+        ZStack { children: Vec::new() }
+    }
+
+    pub fn with_child(mut self, child: impl Widget<T> + 'static) -> Self {
+        self.children.push(Box::new(child));
+        self
+    }
+}
+
+impl<T: Data> Widget<T> for ZStack<T> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        // Dispatch events in reverse order (top-most first)
+        for child in self.children.iter_mut().rev() {
+            child.event(ctx, event, data, env);
+            if ctx.is_handled() {
+                break;
+            }
+        }
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        for child in self.children.iter_mut() {
+            child.lifecycle(ctx, event, data, env);
+        }
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, _old_data: &T, data: &T, env: &Env) {
+        for child in self.children.iter_mut() {
+            child.update(ctx, data, env);
+        }
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        let mut max_size = Size::ZERO;
+        // Layout all children with the same constraints (fill the stack)
+        for child in self.children.iter_mut() {
+            let size = child.layout(ctx, bc, data, env);
+            max_size.width = max_size.width.max(size.width);
+            max_size.height = max_size.height.max(size.height);
+            
+            // Center the child in the stack space
+            let origin = Point::new(
+                (bc.max().width - size.width) / 2.0,
+                (bc.max().height - size.height) / 2.0
+            );
+            child.set_origin(ctx, data, env, origin);
+        }
+        
+        // If constraints are infinite, use max_size, otherwise fill
+        if bc.is_width_bounded() && bc.is_height_bounded() {
+            bc.max()
+        } else {
+            max_size
+        }
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        for child in self.children.iter_mut() {
+            child.paint(ctx, data, env);
+        }
+    }
+}
 
 pub fn build_intent_bar() -> impl Widget<AppState> {
     let input = TextBox::new()
@@ -28,6 +100,7 @@ pub fn build_intent_bar() -> impl Widget<AppState> {
                     panel_type: "code".to_string(),
                     is_verified: true,
                     proof_hash: "0xabc123".to_string(),
+                    x: 100.0, y: 100.0, z_index: 1,
                 });
             } else if data.intent_input == "tune battery" {
                  data.active_panels.push_back(PanelData {
@@ -37,6 +110,7 @@ pub fn build_intent_bar() -> impl Widget<AppState> {
                     panel_type: "graph".to_string(),
                     is_verified: true,
                     proof_hash: "0xdef456".to_string(),
+                    x: 200.0, y: 150.0, z_index: 2,
                 });
                 // Trigger Nudge
                 data.dao_proposal_active = true;
@@ -52,13 +126,14 @@ pub fn build_intent_bar() -> impl Widget<AppState> {
         .with_spacer(10.0)
         .with_child(execute_btn)
         .padding(10.0)
-        .background(theme::INTENT_BAR_BG)
+        .background(theme::NEURAL_BLUE_START)
         .rounded(8.0)
+        .border(theme::SHARD_GLOW, 1.0)
 }
 
 pub fn build_status_bar() -> impl Widget<AppState> {
     Label::new(|data: &AppState, _env: &_| data.system_status.clone())
         .with_text_size(12.0)
-        .with_text_color(Color::grey(0.6))
+        .with_text_color(theme::TEXT_GRAY)
         .padding(5.0)
 }
