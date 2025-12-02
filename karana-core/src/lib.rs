@@ -34,3 +34,6 @@ pub mod context;
 pub mod learning;
 pub mod memory;
 pub mod proactive;
+
+// Simulator for testing without hardware
+pub mod simulator;
