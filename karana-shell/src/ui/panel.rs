@@ -26,11 +26,11 @@ fn build_single_panel() -> impl Widget<PanelData> {
         .with_flex_child(
             Label::new(|data: &PanelData, _env: &_| data.title.clone())
                 .with_font(theme::FONT_HEADER)
-                .with_text_color(theme::SHARD_CRYSTAL),
+                .with_text_color(theme::HUD_CYAN),
             1.0
         )
         .with_child(
-            Label::new("✕").with_text_color(theme::TEXT_GRAY).padding(5.0)
+            Label::new("✕").with_text_color(theme::HUD_DIM).padding(5.0)
         )
         .padding((10.0, 10.0, 10.0, 5.0));
 
@@ -38,7 +38,7 @@ fn build_single_panel() -> impl Widget<PanelData> {
     let body = Container::new(
         Label::new(|data: &PanelData, _env: &_| data.content.clone())
             .with_font(theme::FONT_CODE)
-            .with_text_color(theme::TEXT_GRAY)
+            .with_text_color(theme::HUD_DIM)
             .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
     )
     .padding(10.0)
@@ -51,10 +51,9 @@ fn build_single_panel() -> impl Widget<PanelData> {
                 if data.is_verified { "ZK-SNARK ✓" } else { "Unverified" }
             })
             .with_text_size(10.0)
-            .with_text_color(if true { theme::SHARD_GLOW } else { theme::ALERT_RED })
+            .with_text_color(if true { theme::HUD_GREEN } else { theme::HUD_RED })
             .padding(5.0)
-            .background(Color::rgba8(0, 188, 212, 30)) // Glow bg
-            .rounded(4.0)
+            .background(theme::HUD_GREEN.with_alpha(0.1)) // Glow bg
         )
         .with_spacer(10.0)
         .with_child(
@@ -72,18 +71,12 @@ fn build_single_panel() -> impl Widget<PanelData> {
             .with_child(header)
             .with_child(druid::widget::Painter::new(|ctx, _, _| {
                 let rect = ctx.size().to_rect();
-                ctx.fill(rect, &Color::rgba8(255, 255, 255, 10)); // Separator line
+                ctx.fill(rect, &theme::HUD_CYAN.with_alpha(0.2)); // Separator line
             }).fix_height(1.0))
             .with_child(body)
             .with_child(footer)
     )
     .background(theme::SHARD_BG)
-    .rounded(12.0)
-    .border(theme::SHARD_GLOW.with_alpha(0.3), 1.0)
-    // Shadow Simulation
-    .background(Painter::new(|ctx, _, _| {
-        let shadow_rect = ctx.size().to_rect().inset(-5.0);
-        ctx.fill(shadow_rect, &Color::rgba8(0, 0, 0, 100));
-    }))
-    .padding(10.0) // Margin for shadow
+    .border(theme::HUD_CYAN.with_alpha(0.5), 1.0)
+    .padding(10.0) // Margin
 }

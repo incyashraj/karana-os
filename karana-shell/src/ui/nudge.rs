@@ -11,13 +11,13 @@ impl DaoNudge {
             .with_child(
                 Label::new("🏛️ DAO Governance")
                     .with_font(theme::FONT_HEADER)
-                    .with_text_color(theme::SHARD_GLOW)
+                    .with_text_color(theme::HUD_CYAN)
             )
             .with_spacer(5.0)
             .with_child(
                 Label::new(|data: &AppState, _env: &_| data.dao_proposal_text.clone())
                     .with_font(theme::FONT_BODY)
-                    .with_text_color(theme::SHARD_CRYSTAL)
+                    .with_text_color(theme::HUD_CYAN)
             )
             .with_spacer(15.0)
             .with_child(
@@ -40,8 +40,7 @@ impl DaoNudge {
 
         let container = Container::new(content)
             .background(Color::rgba8(0, 0, 0, 220)) // Semi-transparent overlay
-            .rounded(16.0)
-            .border(theme::SHARD_GLOW, 2.0)
+            .border(theme::HUD_CYAN, 2.0)
             .padding(20.0);
 
         // Conditional Visibility
