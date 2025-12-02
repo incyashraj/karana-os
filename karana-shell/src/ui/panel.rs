@@ -1,4 +1,4 @@
-use druid::{Widget, WidgetExt, Color, LensExt};
+use druid::{Widget, WidgetExt, Color};
 use druid::widget::{Flex, Label, Container, List, Scroll, Painter, Button};
 use crate::state::{AppState, PanelData};
 use crate::ui::theme;

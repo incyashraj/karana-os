@@ -1,5 +1,5 @@
-use druid::{Widget, WidgetExt, EventCtx, Event, Env, PaintCtx, RenderContext, Color, Point, LinearGradient, UnitPoint};
-use druid::widget::{Painter, Controller, Flex, TextBox, Label};
+use druid::{Widget, WidgetExt, EventCtx, Event, Env, RenderContext, Color, LinearGradient, UnitPoint};
+use druid::widget::{Painter, Controller, Flex, TextBox};
 use crate::state::AppState;
 use crate::ui::theme;
 

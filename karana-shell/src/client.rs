@@ -1,5 +1,4 @@
 use anyhow::Result;
-use karana_core::net::KaranaSwarm; // Example import to show linkage
 
 #[derive(Clone)]
 pub struct KaranaClient {

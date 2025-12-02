@@ -1,6 +1,6 @@
 use druid::{
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    Size, UpdateCtx, Widget, WidgetExt, Color, Point, Rect
+    Size, UpdateCtx, Widget, WidgetExt, Color, Point
 };
 use druid::widget::{Flex, Label, TextBox, Button};
 use crate::state::{AppState, PanelData};

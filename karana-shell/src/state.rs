@@ -1,5 +1,5 @@
 use druid::{Data, Lens};
-use im::Vector;
+use druid::im::Vector;
 use crate::client::KaranaClient;
 use std::sync::Arc;
 
