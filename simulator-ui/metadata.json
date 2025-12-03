@@ -1,0 +1,9 @@
+{
+  "name": "Kāraṇa OS Simulator",
+  "description": "A simulation of the Sovereign AI-Native Operating System for Smart Glasses, featuring the Oracle Layer, Wallet, and Vision Intelligence.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

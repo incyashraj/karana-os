@@ -36,38 +36,47 @@ alloy-primitives = { version = "1.4.1", features = ["serde"] }
 rocksdb = "0.24.0"
 celestia-rpc = "0.15.0"
 celestia-types = "0.17.0"
+reqwest = { version = "0.11", features = ["json"] }
+base64 = "0.21"
 lru = "0.12.5"
 ratatui = "0.29.0"
 crossterm = "0.29.0"
-tui-logger = "0.17.4"
+tui-logger = { version = "0.17.4", features = ["crossterm"] }
 log = "0.4.28"
-clap = { version = "4.5.53", features = ["derive"] }
-sysinfo = "0.37.2"
-symphonia = { version = "0.5.5", features = ["all"] }
+env_logger = "0.11"
+chrono = "0.4"
+symphonia = { version = "0.5.3", features = ["all"] }
+cpal = "0.15"
+hound = "3.5.1"
 evdev = "0.12.1"
-image = "0.25.9"
-uuid = { version = "1.18.1", features = ["v4"] }
-env_logger = "0.11.8"
-chrono = "0.4.42"
-reqwest = { version = "0.12.24", features = ["json"] }
-base64 = "0.22.1"
-hound = "3.5"
-term_size = "0.3.2"
-ctrlc = "3.5.1"
-ed25519-dalek = "2.2.0"
-bip39 = { version = "2.2.0", features = ["rand"] }
-zeroize = "1.8.2"
+image = "0.24.7"
+sysinfo = "0.30.5"
+term_size = "0.3"
+ctrlc = "3.4"
+libc = "0.2"
+ed25519-dalek = { version = "2.1.0", features = ["rand_core"] }
+bip39 = "2.2.0"
 aes-gcm = "0.10.3"
+pbkdf2 = "0.12.2"
 bs58 = "0.5.1"
-dirs = "6.0.0"
-getrandom = "0.3.4"
+zeroize = { version = "1.8", features = ["derive"] }
 
-# Camera support (v4l2 for Linux)
+# Optional dependencies
 rscam = { version = "0.5.5", optional = true }
+eframe = { version = "0.29", optional = true }
+egui = { version = "0.29", optional = true }
+egui_extras = { version = "0.29", features = ["image"], optional = true }
+axum = { version = "0.8.7", features = ["ws"] }
+dirs = "6.0.0"
+tower-http = { version = "0.6.7", features = ["cors"] }
+futures = "0.3.31"
+uuid = { version = "1.19.0", features = ["v4"] }
+clap = { version = "4.5.53", features = ["derive"] }
 
 [features]
 default = []
-v4l2 = ["dep:rscam"]
+v4l2 = ["rscam"]
+gui = ["eframe", "egui", "egui_extras"]
 
 [profile.dev.package."*"]
 opt-level = 3

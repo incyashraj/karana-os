@@ -37,3 +37,6 @@ pub mod proactive;
 
 // Simulator for testing without hardware
 pub mod simulator;
+
+// HTTP/WebSocket API server
+pub mod api;

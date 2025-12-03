@@ -110,8 +110,11 @@ impl KaranaWallet {
     /// 
     /// Returns the wallet and the recovery phrase that MUST be backed up
     pub fn generate(device_id: &str) -> Result<WalletCreationResult> {
-        // Generate random entropy for 24-word mnemonic (256 bits)
-        let mnemonic = Mnemonic::generate(24)
+        // Generate random entropy for 24-word mnemonic (256 bits = 32 bytes)
+        let mut entropy = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut entropy);
+        
+        let mnemonic = Mnemonic::from_entropy(&entropy)
             .map_err(|e| anyhow!("Failed to generate mnemonic: {}", e))?;
         
         let words: Vec<String> = mnemonic.words().map(|s| s.to_string()).collect();

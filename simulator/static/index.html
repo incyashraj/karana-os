@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kāraṇa OS - Smart Glasses Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 32px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #00d4ff, #7b68ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 25px;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 25px;
+            font-size: 14px;
+        }
+
+        .battery {
+            color: #4ade80;
+        }
+
+        .battery.low {
+            color: #f87171;
+        }
+
+        /* Main Layout */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 20px;
+            height: calc(100vh - 140px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .scene-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .scene-btn {
+            padding: 15px 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            color: #fff;
+        }
+
+        .scene-btn:hover {
+            background: rgba(100, 150, 255, 0.15);
+            border-color: rgba(100, 150, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .scene-btn.active {
+            background: linear-gradient(135deg, rgba(100, 150, 255, 0.3), rgba(150, 100, 255, 0.3));
+            border-color: #6495ed;
+        }
+
+        .scene-btn .emoji {
+            font-size: 28px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .scene-btn .label {
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .toggle-group {
+            margin-bottom: 25px;
+        }
+
+        .toggle-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .toggle-label {
+            font-size: 14px;
+            color: #cbd5e1;
+        }
+
+        .toggle {
+            width: 50px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle.active {
+            background: linear-gradient(90deg, #00d4ff, #7b68ee);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all 0.3s ease;
+        }
+
+        .toggle.active::after {
+            left: 27px;
+        }
+
+        /* AR Viewport */
+        .ar-viewport {
+            background: linear-gradient(180deg, #1a1a3e 0%, #0f0f2d 100%);
+            border-radius: 30px;
+            position: relative;
+            overflow: hidden;
+            border: 3px solid rgba(100, 150, 255, 0.3);
+            box-shadow: 0 0 60px rgba(100, 150, 255, 0.2);
+        }
+
+        .viewport-frame {
+            position: absolute;
+            inset: 0;
+            border: 20px solid #0a0a1a;
+            border-radius: 30px;
+            pointer-events: none;
+        }
+
+        .viewport-inner {
+            position: absolute;
+            inset: 20px;
+            background: linear-gradient(180deg, 
+                rgba(30, 30, 60, 0.8) 0%, 
+                rgba(20, 20, 50, 0.9) 100%);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .scene-view {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .scene-title {
+            font-size: 42px;
+            margin-bottom: 10px;
+        }
+
+        .scene-name {
+            font-size: 24px;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 40px;
+        }
+
+        /* Bounding Boxes */
+        .bounding-box {
+            position: absolute;
+            border: 2px solid;
+            border-radius: 8px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        .box-label {
+            position: absolute;
+            top: -28px;
+            left: 0;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 4px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* Navigation Overlay */
+        .nav-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .nav-arrow {
+            width: 80px;
+            height: 100px;
+            background: linear-gradient(180deg, #00d4ff, #0099cc);
+            clip-path: polygon(50% 0%, 0% 40%, 20% 40%, 20% 100%, 80% 100%, 80% 40%, 100% 40%);
+            animation: bounce 1s ease-in-out infinite;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .nav-destination {
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px 35px;
+            border-radius: 15px;
+            margin-top: 30px;
+            text-align: center;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .nav-destination h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .nav-destination p {
+            color: #00d4ff;
+            font-size: 14px;
+        }
+
+        /* Mini Map */
+        .mini-map {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 120px;
+            height: 120px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 15px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mini-map-dot {
+            width: 14px;
+            height: 14px;
+            background: #00d4ff;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .mini-map-dot::after {
+            content: '';
+            position: absolute;
+            inset: -10px;
+            border: 2px solid #00d4ff;
+            border-radius: 50%;
+            animation: radar 1.5s ease-out infinite;
+        }
+
+        @keyframes radar {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+
+        /* Right Panel - Chat */
+        .chat-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .ai-avatar {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #00d4ff, #7b68ee);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .ai-info h3 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .ai-info p {
+            font-size: 12px;
+            color: #4ade80;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding-right: 10px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message-bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #6495ed, #7b68ee);
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.ai .message-bubble {
+            background: rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 5px;
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 15px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #6495ed;
+            border-radius: 50%;
+            animation: typing 1.4s infinite both;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            padding: 12px 20px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+            border-color: #6495ed;
+            background: rgba(100, 150, 255, 0.1);
+        }
+
+        .chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #00d4ff, #7b68ee);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 25px rgba(100, 150, 255, 0.5);
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .quick-btn {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quick-btn:hover {
+            background: rgba(100, 150, 255, 0.2);
+            border-color: rgba(100, 150, 255, 0.4);
+        }
+
+        /* Detected Objects List */
+        .objects-list {
+            margin-top: 20px;
+        }
+
+        .object-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+
+        .object-icon {
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .object-info {
+            flex: 1;
+        }
+
+        .object-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .confidence-bar {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.5s ease;
+        }
+
+        .object-confidence {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        /* Notifications */
+        .notification-toast {
+            position: fixed;
+            top: 100px;
+            right: 30px;
+            background: rgba(20, 20, 40, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 320px;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            transform: translateX(400px);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+        }
+
+        .notification-toast.show {
+            transform: translateX(0);
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .notification-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .notification-body {
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        /* Memory Panel */
+        .memory-list {
+            margin-top: 10px;
+        }
+
+        .memory-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 3px solid #00d4ff;
+        }
+
+        .memory-what {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 5px;
+        }
+
+        .memory-where {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+
+        .memory-when {
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+
+            .sidebar {
+                order: 2;
+            }
+
+            .ar-viewport {
+                height: 400px;
+                order: 1;
+            }
+
+            .chat-panel {
+                order: 3;
+                max-height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🕶️</span>
+                <h1>Kāraṇa OS</h1>
+            </div>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span>📍</span>
+                    <span id="location">Living Room</span>
+                </div>
+                <div class="status-item">
+                    <span>📶</span>
+                    <span>Strong</span>
+                </div>
+                <div class="status-item battery" id="battery">
+                    <span>🔋</span>
+                    <span>87%</span>
+                </div>
+                <div class="status-item">
+                    <span>🕐</span>
+                    <span id="time">10:30 AM</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            <!-- Left Sidebar -->
+            <div class="sidebar">
+                <h2>Environment</h2>
+                <div class="scene-grid">
+                    <button class="scene-btn active" data-scene="home">
+                        <span class="emoji">🏠</span>
+                        <span class="label">Home</span>
+                    </button>
+                    <button class="scene-btn" data-scene="kitchen">
+                        <span class="emoji">🍳</span>
+                        <span class="label">Kitchen</span>
+                    </button>
+                    <button class="scene-btn" data-scene="office">
+                        <span class="emoji">💼</span>
+                        <span class="label">Office</span>
+                    </button>
+                    <button class="scene-btn" data-scene="street">
+                        <span class="emoji">🛣️</span>
+                        <span class="label">Street</span>
+                    </button>
+                    <button class="scene-btn" data-scene="park">
+                        <span class="emoji">🌳</span>
+                        <span class="label">Park</span>
+                    </button>
+                    <button class="scene-btn" data-scene="store">
+                        <span class="emoji">🏪</span>
+                        <span class="label">Store</span>
+                    </button>
+                </div>
+
+                <h2>AR Overlays</h2>
+                <div class="toggle-group">
+                    <div class="toggle-item">
+                        <span class="toggle-label">Object Detection</span>
+                        <div class="toggle active" id="toggleObjects"></div>
+                    </div>
+                    <div class="toggle-item">
+                        <span class="toggle-label">Navigation</span>
+                        <div class="toggle" id="toggleNav"></div>
+                    </div>
+                    <div class="toggle-item">
+                        <span class="toggle-label">Notifications</span>
+                        <div class="toggle active" id="toggleNotif"></div>
+                    </div>
+                </div>
+
+                <h2>Detected Objects</h2>
+                <div class="objects-list" id="objectsList">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- AR Viewport -->
+            <div class="ar-viewport">
+                <div class="viewport-frame"></div>
+                <div class="viewport-inner">
+                    <div class="scene-view" id="sceneView">
+                        <span class="scene-title" id="sceneEmoji">🏠</span>
+                        <span class="scene-name" id="sceneName">Living Room View</span>
+                    </div>
+                    
+                    <!-- Object Bounding Boxes -->
+                    <div id="boundingBoxes"></div>
+                    
+                    <!-- Navigation Overlay -->
+                    <div class="nav-overlay" id="navOverlay" style="display: none;">
+                        <div class="nav-arrow"></div>
+                        <div class="nav-destination">
+                            <h3>☕ Blue Bottle Coffee</h3>
+                            <p>350m • 4 min walk</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Mini Map -->
+                    <div class="mini-map">
+                        <div class="mini-map-dot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - AI Chat -->
+            <div class="chat-panel">
+                <div class="chat-header">
+                    <div class="ai-avatar">🧠</div>
+                    <div class="ai-info">
+                        <h3>Kāraṇa AI</h3>
+                        <p>● Online</p>
+                    </div>
+                </div>
+
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message ai">
+                        <div class="message-bubble">
+                            Hello! I'm Kāraṇa, your AI assistant. I can help you identify objects, navigate, remember things, and more. Try asking me something! 🕶️
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Ask Kāraṇa anything...">
+                    <button class="send-btn" id="sendBtn">➤</button>
+                </div>
+
+                <div class="quick-actions">
+                    <button class="quick-btn" data-query="What do you see?">👁️ What do you see?</button>
+                    <button class="quick-btn" data-query="Navigate to coffee shop">📍 Navigate</button>
+                    <button class="quick-btn" data-query="Where are my keys?">🔑 Find keys</button>
+                    <button class="quick-btn" data-query="Set a timer for 5 minutes">⏰ Set timer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="notification-toast" id="notification">
+        <div class="notification-header">
+            <div style="display: flex; align-items: flex-start;">
+                <span class="notification-icon" id="notifIcon">📧</span>
+                <div>
+                    <div class="notification-title" id="notifTitle">New Message</div>
+                    <div class="notification-body" id="notifBody">You have a new notification</div>
+                </div>
+            </div>
+            <button class="notification-close" onclick="hideNotification()">×</button>
+        </div>
+    </div>
+
+    <script>
+        // Scene data
+        const scenes = {
+            home: {
+                emoji: '🏠',
+                name: 'Living Room View',
+                location: 'Living Room',
+                objects: [
+                    { name: 'Couch', confidence: 96, color: '#8b5a2b', x: 15, y: 35, w: 25, h: 20 },
+                    { name: 'TV', confidence: 94, color: '#6495ed', x: 55, y: 25, w: 18, h: 22 },
+                    { name: 'Coffee Table', confidence: 92, color: '#cd853f', x: 25, y: 60, w: 20, h: 12 },
+                    { name: 'Lamp', confidence: 89, color: '#ffd700', x: 78, y: 30, w: 10, h: 18 },
+                    { name: 'Book', confidence: 85, color: '#dda0dd', x: 30, y: 65, w: 8, h: 5 }
+                ]
+            },
+            kitchen: {
+                emoji: '🍳',
+                name: 'Kitchen View',
+                location: 'Kitchen',
+                objects: [
+                    { name: 'Apple', confidence: 97, color: '#ff6347', x: 35, y: 45, w: 10, h: 10 },
+                    { name: 'Frying Pan', confidence: 95, color: '#708090', x: 55, y: 40, w: 18, h: 12 },
+                    { name: 'Knife', confidence: 93, color: '#c0c0c0', x: 20, y: 55, w: 15, h: 5 },
+                    { name: 'Cutting Board', confidence: 90, color: '#deb887', x: 15, y: 48, w: 22, h: 14 },
+                    { name: 'Coffee Maker', confidence: 88, color: '#2f4f4f', x: 72, y: 30, w: 14, h: 22 }
+                ]
+            },
+            office: {
+                emoji: '💼',
+                name: 'Office View',
+                location: 'Office',
+                objects: [
+                    { name: 'Laptop', confidence: 98, color: '#4169e1', x: 30, y: 40, w: 22, h: 15 },
+                    { name: 'Monitor', confidence: 96, color: '#1e90ff', x: 55, y: 25, w: 25, h: 20 },
+                    { name: 'Keyboard', confidence: 94, color: '#696969', x: 35, y: 60, w: 20, h: 8 },
+                    { name: 'Coffee Mug', confidence: 91, color: '#8b4513', x: 15, y: 50, w: 8, h: 10 },
+                    { name: 'Notebook', confidence: 87, color: '#f0e68c', x: 70, y: 55, w: 12, h: 16 }
+                ]
+            },
+            street: {
+                emoji: '🛣️',
+                name: 'Street View',
+                location: 'Downtown',
+                objects: [
+                    { name: 'Car', confidence: 95, color: '#dc143c', x: 25, y: 50, w: 25, h: 15 },
+                    { name: 'Traffic Light', confidence: 93, color: '#32cd32', x: 70, y: 15, w: 8, h: 25 },
+                    { name: 'Pedestrian', confidence: 90, color: '#ffb6c1', x: 50, y: 40, w: 10, h: 25 },
+                    { name: 'Store Sign', confidence: 88, color: '#ffa500', x: 15, y: 20, w: 20, h: 10 },
+                    { name: 'Tree', confidence: 85, color: '#228b22', x: 80, y: 30, w: 12, h: 30 }
+                ]
+            },
+            park: {
+                emoji: '🌳',
+                name: 'Park View',
+                location: 'Central Park',
+                objects: [
+                    { name: 'Dog', confidence: 94, color: '#d2691e', x: 40, y: 55, w: 15, h: 12 },
+                    { name: 'Bench', confidence: 92, color: '#8b4513', x: 20, y: 60, w: 22, h: 10 },
+                    { name: 'Person Jogging', confidence: 89, color: '#ff69b4', x: 65, y: 45, w: 10, h: 22 },
+                    { name: 'Fountain', confidence: 86, color: '#87ceeb', x: 45, y: 30, w: 18, h: 18 },
+                    { name: 'Flower Bed', confidence: 83, color: '#ff1493', x: 10, y: 70, w: 25, h: 8 }
+                ]
+            },
+            store: {
+                emoji: '🏪',
+                name: 'Store View',
+                location: 'Grocery Store',
+                objects: [
+                    { name: 'Shopping Cart', confidence: 95, color: '#c0c0c0', x: 25, y: 50, w: 18, h: 20 },
+                    { name: 'Product Shelf', confidence: 93, color: '#8b4513', x: 55, y: 20, w: 30, h: 40 },
+                    { name: 'Price Tag', confidence: 90, color: '#ffff00', x: 60, y: 35, w: 8, h: 5 },
+                    { name: 'Checkout Counter', confidence: 88, color: '#808080', x: 10, y: 65, w: 25, h: 12 },
+                    { name: 'Customer', confidence: 85, color: '#dda0dd', x: 70, y: 55, w: 10, h: 25 }
+                ]
+            }
+        };
+
+        // AI Responses
+        const aiResponses = {
+            'what do you see': (scene) => {
+                const objs = scenes[scene].objects.slice(0, 3).map(o => o.name).join(', ');
+                return `I can see several things in the ${scenes[scene].name.toLowerCase()}! The main objects I detect are: ${objs}. Would you like more details about any of them?`;
+            },
+            'navigate': () => {
+                document.getElementById('toggleNav').classList.add('active');
+                document.getElementById('navOverlay').style.display = 'flex';
+                return "I've started navigation to Blue Bottle Coffee. It's 350 meters away, about a 4-minute walk. Follow the AR arrows in your view! ☕";
+            },
+            'keys': () => "I found your keys! 🔑 They're on the kitchen counter, near the fruit bowl. You put them there about 2 hours ago after coming back from your morning jog.",
+            'wallet': () => "Your wallet is on the bedroom nightstand. You placed it there this morning when you changed clothes.",
+            'timer': () => {
+                showNotification('⏰', 'Timer Set', 'I\'ll remind you in 5 minutes!');
+                return "Done! I've set a timer for 5 minutes. I'll notify you when it's up! ⏰";
+            },
+            'cook': () => "Based on what I see in the kitchen - apples, a frying pan, and some ingredients - I'd suggest:\n\n🍎 Caramelized Apples (10 min)\n🥞 Apple Pancakes (15 min)\n🥗 Apple Walnut Salad (5 min)\n\nWould you like the full recipe for any of these?",
+            'weather': () => "It's currently 72°F (22°C) and partly cloudy. ⛅ Perfect weather for a walk! There's a 10% chance of rain later this evening.",
+            'time': () => `The current time is ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.`,
+            'hello': () => "Hello! 👋 I'm Kāraṇa, your AI assistant. I can help you identify objects, navigate to places, remember where you put things, or answer questions. What would you like to do?",
+            'thank': () => "You're welcome! 😊 Is there anything else I can help you with?",
+            'person': () => "I recognize that person! 👤 It's Alex from Engineering. You last met at the project sync 3 days ago. They mentioned the launch deadline is this Friday.",
+            'default': (query) => `I understand you're asking about "${query}". Let me help you with that! You can ask me to:\n\n• Identify objects around you\n• Navigate to places\n• Find things you've misplaced\n• Set reminders\n• Get information about the weather, time, etc.`
+        };
+
+        // Current state
+        let currentScene = 'home';
+        let showObjects = true;
+        let showNav = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateScene('home');
+            updateTime();
+            setInterval(updateTime, 60000);
+            setInterval(drainBattery, 30000);
+
+            // Scene buttons
+            document.querySelectorAll('.scene-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.scene-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateScene(btn.dataset.scene);
+                });
+            });
+
+            // Toggles
+            document.getElementById('toggleObjects').addEventListener('click', function() {
+                this.classList.toggle('active');
+                showObjects = this.classList.contains('active');
+                updateBoundingBoxes();
+            });
+
+            document.getElementById('toggleNav').addEventListener('click', function() {
+                this.classList.toggle('active');
+                showNav = this.classList.contains('active');
+                document.getElementById('navOverlay').style.display = showNav ? 'flex' : 'none';
+            });
+
+            // Chat
+            document.getElementById('sendBtn').addEventListener('click', sendMessage);
+            document.getElementById('chatInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+
+            // Quick actions
+            document.querySelectorAll('.quick-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('chatInput').value = btn.dataset.query;
+                    sendMessage();
+                });
+            });
+
+            // Welcome notification
+            setTimeout(() => {
+                showNotification('🕶️', 'Welcome to Kāraṇa OS', 'Your smart glasses are ready to use!');
+            }, 2000);
+        });
+
+        function updateScene(scene) {
+            currentScene = scene;
+            const data = scenes[scene];
+            document.getElementById('sceneEmoji').textContent = data.emoji;
+            document.getElementById('sceneName').textContent = data.name;
+            document.getElementById('location').textContent = data.location;
+            updateBoundingBoxes();
+            updateObjectsList();
+        }
+
+        function updateBoundingBoxes() {
+            const container = document.getElementById('boundingBoxes');
+            container.innerHTML = '';
+            
+            if (!showObjects) return;
+
+            const data = scenes[currentScene];
+            data.objects.forEach((obj, i) => {
+                const box = document.createElement('div');
+                box.className = 'bounding-box';
+                box.style.cssText = `
+                    left: ${obj.x}%;
+                    top: ${obj.y}%;
+                    width: ${obj.w}%;
+                    height: ${obj.h}%;
+                    border-color: ${obj.color};
+                    animation-delay: ${i * 0.2}s;
+                `;
+                box.innerHTML = `<div class="box-label" style="color: ${obj.color}">${obj.name} ${obj.confidence}%</div>`;
+                container.appendChild(box);
+            });
+        }
+
+        function updateObjectsList() {
+            const list = document.getElementById('objectsList');
+            list.innerHTML = '';
+            
+            const data = scenes[currentScene];
+            data.objects.forEach(obj => {
+                const item = document.createElement('div');
+                item.className = 'object-item';
+                item.innerHTML = `
+                    <div class="object-icon" style="background: ${obj.color}20; color: ${obj.color}">
+                        ${getObjectEmoji(obj.name)}
+                    </div>
+                    <div class="object-info">
+                        <div class="object-name">${obj.name}</div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${obj.confidence}%; background: ${obj.color}"></div>
+                        </div>
+                    </div>
+                    <div class="object-confidence">${obj.confidence}%</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function getObjectEmoji(name) {
+            const emojis = {
+                'Couch': '🛋️', 'TV': '📺', 'Coffee Table': '🪑', 'Lamp': '💡', 'Book': '📖',
+                'Apple': '🍎', 'Frying Pan': '🍳', 'Knife': '🔪', 'Cutting Board': '🪵', 'Coffee Maker': '☕',
+                'Laptop': '💻', 'Monitor': '🖥️', 'Keyboard': '⌨️', 'Coffee Mug': '☕', 'Notebook': '📓',
+                'Car': '🚗', 'Traffic Light': '🚦', 'Pedestrian': '🚶', 'Store Sign': '🏪', 'Tree': '🌳',
+                'Dog': '🐕', 'Bench': '🪑', 'Person Jogging': '🏃', 'Fountain': '⛲', 'Flower Bed': '🌸',
+                'Shopping Cart': '🛒', 'Product Shelf': '🗄️', 'Price Tag': '🏷️', 'Checkout Counter': '💵', 'Customer': '👤'
+            };
+            return emojis[name] || '📦';
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            input.value = '';
+
+            // Show typing indicator
+            const typing = document.createElement('div');
+            typing.className = 'message ai';
+            typing.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+            document.getElementById('chatMessages').appendChild(typing);
+            scrollChat();
+
+            // Generate response after delay
+            setTimeout(() => {
+                typing.remove();
+                const response = getAIResponse(message.toLowerCase());
+                addMessage(response, false);
+            }, 1000 + Math.random() * 500);
+        }
+
+        function getAIResponse(query) {
+            if (query.includes('what') && (query.includes('see') || query.includes('looking'))) {
+                return aiResponses['what do you see'](currentScene);
+            } else if (query.includes('navigate') || query.includes('direction') || query.includes('way to')) {
+                return aiResponses['navigate']();
+            } else if (query.includes('key')) {
+                return aiResponses['keys']();
+            } else if (query.includes('wallet')) {
+                return aiResponses['wallet']();
+            } else if (query.includes('timer') || query.includes('remind')) {
+                return aiResponses['timer']();
+            } else if (query.includes('cook') || query.includes('recipe') || query.includes('food')) {
+                return aiResponses['cook']();
+            } else if (query.includes('weather')) {
+                return aiResponses['weather']();
+            } else if (query.includes('time')) {
+                return aiResponses['time']();
+            } else if (query.includes('hello') || query.includes('hi') || query.includes('hey')) {
+                return aiResponses['hello']();
+            } else if (query.includes('thank')) {
+                return aiResponses['thank']();
+            } else if (query.includes('person') || query.includes('who is')) {
+                return aiResponses['person']();
+            }
+            return aiResponses['default'](query);
+        }
+
+        function addMessage(text, isUser) {
+            const msg = document.createElement('div');
+            msg.className = `message ${isUser ? 'user' : 'ai'}`;
+            msg.innerHTML = `<div class="message-bubble">${text.replace(/\n/g, '<br>')}</div>`;
+            document.getElementById('chatMessages').appendChild(msg);
+            scrollChat();
+        }
+
+        function scrollChat() {
+            const container = document.getElementById('chatMessages');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateTime() {
+            document.getElementById('time').textContent = new Date().toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+
+        function drainBattery() {
+            const battery = document.getElementById('battery');
+            const current = parseInt(battery.querySelector('span:last-child').textContent);
+            const newLevel = Math.max(current - 1, 0);
+            battery.querySelector('span:last-child').textContent = newLevel + '%';
+            if (newLevel < 20) battery.classList.add('low');
+        }
+
+        function showNotification(icon, title, body) {
+            const notif = document.getElementById('notification');
+            document.getElementById('notifIcon').textContent = icon;
+            document.getElementById('notifTitle').textContent = title;
+            document.getElementById('notifBody').textContent = body;
+            notif.classList.add('show');
+            setTimeout(hideNotification, 5000);
+        }
+
+        function hideNotification() {
+            document.getElementById('notification').classList.remove('show');
+        }
+    </script>
+</body>
+</html>

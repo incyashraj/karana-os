@@ -524,7 +524,7 @@ impl KaranaAI {
         let _config = self.blip_config.as_ref().unwrap();
         
         // Load and Preprocess Image
-        let img = image::ImageReader::open(image_path)?.decode()?;
+        let img = image::open(image_path)?;
         let (width, height) = (384, 384); // BLIP default
         let img = img.resize_exact(width, height, image::imageops::FilterType::Triangle);
         let img = img.to_rgb8();
