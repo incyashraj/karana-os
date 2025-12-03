@@ -238,14 +238,82 @@ pub async fn analyze_vision(
 // Oracle (NLP Intent) Handler
 // ============================================================================
 
-/// Process natural language intent using the enhanced Oracle engine
+/// Process natural language intent using OracleVeil (preferred) or legacy Oracle (fallback)
 pub async fn process_oracle(
     State(state): State<Arc<AppState>>,
     Json(req): Json<OracleIntentRequest>,
 ) -> impl IntoResponse {
-    use crate::oracle::{Oracle, OracleContext, OracleIntent};
-    
     state.set_mode(OsMode::Oracle).await;
+    
+    // Broadcast: Oracle is thinking
+    state.broadcast_oracle_thinking(&req.text, "parsing").await;
+    
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 3: Try OracleVeil first (ZK-signed intent processing via Monad)
+    // ════════════════════════════════════════════════════════════════════════
+    if let Some(ref veil) = state.oracle_veil {
+        log::info!("[API] 🔮 Processing via OracleVeil: '{}'", req.text);
+        
+        let mut veil = veil.lock().await;
+        
+        // Set user DID if we have a wallet
+        if let Some(wallet) = state.wallet.read().await.as_ref() {
+            veil.set_user_did(wallet.did().to_string()).await;
+        }
+        
+        // Use InputSource::Api for API requests
+        use crate::oracle::veil::InputSource;
+        
+        match veil.mediate(&req.text, InputSource::Api).await {
+            Ok(response) => {
+                state.set_mode(OsMode::Idle).await;
+                
+                // Broadcast whisper and haptic
+                let whisper_id = state.add_whisper(
+                    response.whisper.clone(),
+                    if response.needs_confirmation { "emphasized" } else { "subtle" },
+                    "top_right",
+                    Some(3000),
+                ).await;
+                
+                state.broadcast_oracle_whisper(
+                    &whisper_id,
+                    &response.whisper,
+                    if response.needs_confirmation { "emphasized" } else { "subtle" },
+                    "top_right",
+                    3000,
+                ).await;
+                
+                let haptic_str = format!("{:?}", response.haptic).to_lowercase();
+                state.set_haptic(&haptic_str).await;
+                state.broadcast_oracle_haptic(&haptic_str, 1.0).await;
+                
+                // Convert OracleVeil response to API response format
+                let api_response = OracleIntentResponse {
+                    intent_type: infer_intent_type_from_data(&response.data),
+                    content: response.whisper,
+                    data: convert_command_data_to_intent_data(&response.data),
+                    requires_confirmation: response.needs_confirmation,
+                    suggested_actions: vec![],
+                    confidence: response.confidence,
+                };
+                
+                log::info!("[API] 🔮 OracleVeil processed: {:?} (confidence: {:.0}%)", 
+                    api_response.intent_type, api_response.confidence * 100.0);
+                
+                return (StatusCode::OK, Json(ApiResponse::success(api_response)));
+            }
+            Err(e) => {
+                log::warn!("[API] OracleVeil error: {} - falling back to legacy", e);
+                // Fall through to legacy handler
+            }
+        }
+    }
+    
+    // ════════════════════════════════════════════════════════════════════════
+    // FALLBACK: Legacy Oracle processing (direct, without Monad integration)
+    // ════════════════════════════════════════════════════════════════════════
+    use crate::oracle::{Oracle, OracleContext, OracleIntent};
     
     // Create Oracle instance and set context
     let mut oracle = Oracle::new();
@@ -270,22 +338,52 @@ pub async fn process_oracle(
     // Process through Oracle
     let oracle_response = oracle.process(&req.text, context);
     
+    // Broadcast: Oracle is executing
+    state.broadcast_oracle_thinking(&req.text, "executing").await;
+    
     // Convert Oracle response to API response
-    let (intent_type, data) = match oracle_response.intent {
+    let (intent_type, data, pending_action_id) = match oracle_response.intent.clone() {
         OracleIntent::Transfer { amount, recipient, memo } => {
-            (IntentType::Transfer, Some(IntentData {
+            let data = IntentData {
                 amount: Some(amount),
-                recipient: Some(recipient),
-                memo,
+                recipient: Some(recipient.clone()),
+                memo: memo.clone(),
                 location: None,
                 duration: None,
                 app_type: None,
                 url: None,
                 query: None,
-            }))
+            };
+            
+            // Create pending action for transfers (requires confirmation)
+            let pending = AppState::create_pending_action(
+                IntentType::Transfer,
+                format!("Send {} KARA to {}{}", amount, recipient, 
+                    memo.as_ref().map(|m| format!(" ({})", m)).unwrap_or_default()),
+                Some(data.clone()),
+                None, // ZK proof would go here
+                oracle_response.confidence,
+            );
+            
+            let action_id = pending.id.clone();
+            let expires_at = pending.expires_at;
+            state.add_pending_action(pending).await;
+            
+            // Broadcast: Confirmation required
+            state.broadcast_oracle_confirmation(
+                &action_id,
+                "TRANSFER",
+                &format!("Send {} KARA to {}", amount, recipient),
+                expires_at,
+                oracle_response.confidence,
+            ).await;
+            
+            log::info!("[API] 📝 Created pending transfer action: {}", action_id);
+            
+            (IntentType::Transfer, Some(data), Some(action_id))
         }
         OracleIntent::CheckBalance | OracleIntent::TransactionHistory => {
-            (IntentType::Wallet, None)
+            (IntentType::Wallet, None, None)
         }
         OracleIntent::OpenApp { app_type } => {
             (IntentType::OpenApp, Some(IntentData {
@@ -297,7 +395,7 @@ pub async fn process_oracle(
                 duration: None,
                 url: None,
                 query: None,
-            }))
+            }), None)
         }
         OracleIntent::OpenBrowser { url } => {
             (IntentType::OpenBrowser, Some(IntentData {
@@ -309,7 +407,7 @@ pub async fn process_oracle(
                 location: None,
                 duration: None,
                 query: None,
-            }))
+            }), None)
         }
         OracleIntent::PlayVideo { query, url } => {
             (IntentType::PlayVideo, Some(IntentData {
@@ -321,7 +419,7 @@ pub async fn process_oracle(
                 memo: None,
                 location: None,
                 duration: None,
-            }))
+            }), None)
         }
         OracleIntent::TakeNote { content } => {
             (IntentType::TakeNote, Some(IntentData {
@@ -333,7 +431,7 @@ pub async fn process_oracle(
                 location: None,
                 duration: None,
                 url: None,
-            }))
+            }), None)
         }
         OracleIntent::SetReminder { message, duration } => {
             (IntentType::SetReminder, Some(IntentData {
@@ -345,7 +443,7 @@ pub async fn process_oracle(
                 location: None,
                 app_type: None,
                 url: None,
-            }))
+            }), None)
         }
         OracleIntent::PlayMusic { query } => {
             (IntentType::PlayMusic, Some(IntentData {
@@ -357,7 +455,7 @@ pub async fn process_oracle(
                 location: None,
                 duration: None,
                 url: None,
-            }))
+            }), None)
         }
         OracleIntent::Navigate { destination } => {
             (IntentType::Navigate, Some(IntentData {
@@ -369,32 +467,69 @@ pub async fn process_oracle(
                 app_type: None,
                 url: None,
                 query: None,
-            }))
+            }), None)
         }
         OracleIntent::AnalyzeVision | OracleIntent::ExplainObject { .. } => {
-            (IntentType::Analyze, None)
+            (IntentType::Analyze, None, None)
         }
         OracleIntent::CloseApp { .. } => {
-            (IntentType::CloseApp, None)
+            (IntentType::CloseApp, None, None)
         }
         OracleIntent::Help => {
-            (IntentType::Help, None)
+            (IntentType::Help, None, None)
         }
         _ => {
-            (IntentType::Speak, None)
+            (IntentType::Speak, None, None)
         }
     };
     
     state.set_mode(OsMode::Idle).await;
     
+    // Update requires_confirmation based on whether we created a pending action
+    let needs_confirmation = pending_action_id.is_some() || oracle_response.requires_confirmation;
+    
+    // Add pending action ID to suggested actions if present
+    let mut suggested = oracle_response.suggested_actions.clone();
+    if let Some(ref action_id) = pending_action_id {
+        suggested.insert(0, format!("action_id:{}", action_id));
+    }
+    
+    // Clone message before moving into response
+    let message = oracle_response.message.clone();
+    
     let response = OracleIntentResponse {
-        intent_type,
+        intent_type: intent_type.clone(),
         content: oracle_response.message,
         data,
-        requires_confirmation: oracle_response.requires_confirmation,
-        suggested_actions: oracle_response.suggested_actions,
+        requires_confirmation: needs_confirmation,
+        suggested_actions: suggested,
         confidence: oracle_response.confidence,
     };
+    
+    // Add whisper and haptic feedback for the response
+    let style = if needs_confirmation { "emphasized" } else { "subtle" };
+    let haptic = if needs_confirmation { "confirm" } else { "success" };
+    
+    // Add whisper and broadcast it
+    let whisper_id = state.add_whisper(
+        message.clone(),
+        style,
+        "top_right",
+        Some(3000),
+    ).await;
+    
+    // Broadcast whisper event
+    state.broadcast_oracle_whisper(
+        &whisper_id,
+        &message,
+        style,
+        "top_right",
+        3000,
+    ).await;
+    
+    // Set haptic and broadcast it
+    state.set_haptic(haptic).await;
+    state.broadcast_oracle_haptic(haptic, 1.0).await;
     
     log::info!("[API] 🔮 Oracle processed: {:?} (confidence: {:.0}%)", 
         response.intent_type, response.confidence * 100.0);
@@ -515,3 +650,316 @@ async fn handle_ws(mut socket: WebSocket, state: Arc<AppState>) {
     
     log::info!("[API] WebSocket connection closed");
 }
+
+// ============================================================================
+// Confirmation Handlers
+// ============================================================================
+
+/// Get all pending actions awaiting confirmation
+pub async fn get_pending_actions(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let actions = state.get_all_pending_actions().await;
+    
+    log::info!("[API] 📋 Retrieved {} pending actions", actions.len());
+    
+    (StatusCode::OK, Json(ApiResponse::success(actions)))
+}
+
+/// Confirm or reject a pending action
+pub async fn confirm_action(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ConfirmActionRequest>,
+) -> impl IntoResponse {
+    // Get the pending action
+    let action = match state.remove_pending_action(&req.action_id).await {
+        Some(a) => a,
+        None => {
+            log::warn!("[API] Attempted to confirm non-existent action: {}", req.action_id);
+            return (StatusCode::NOT_FOUND, Json(ApiResponse::<ConfirmActionResponse>::error(
+                "Pending action not found or expired"
+            )));
+        }
+    };
+    
+    if !req.approved {
+        log::info!("[API] ❌ Action {} rejected by user", req.action_id);
+        return (StatusCode::OK, Json(ApiResponse::success(ConfirmActionResponse {
+            success: true,
+            tx_hash: None,
+            message: "Action rejected".to_string(),
+        })));
+    }
+    
+    // Process the confirmed action
+    let result = match action.action_type {
+        IntentType::Transfer => {
+            if let Some(data) = &action.data {
+                let amount = data.amount.unwrap_or(0);
+                let recipient = data.recipient.clone().unwrap_or_default();
+                
+                // Check balance
+                if !state.debit(amount).await {
+                    return (StatusCode::BAD_REQUEST, Json(ApiResponse::<ConfirmActionResponse>::error(
+                        "Insufficient balance"
+                    )));
+                }
+                
+                // Create transaction
+                let tx_hash = format!("0x{}", hex::encode(&uuid::Uuid::new_v4().as_bytes()[..16]));
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                
+                let tx = Transaction {
+                    id: tx_hash.clone(),
+                    tx_type: "TRANSFER".to_string(),
+                    amount,
+                    recipient: recipient.clone(),
+                    sender: "user".to_string(),
+                    timestamp: now,
+                    status: "CONFIRMED".to_string(),
+                    signature: None,
+                    da_tx_hash: None,
+                };
+                
+                state.add_transaction(tx).await;
+                
+                // Broadcast wallet update
+                let balance = *state.balance.read().await;
+                let ws_msg = serde_json::to_string(&WsMessage::WalletUpdate {
+                    balance,
+                    last_tx_hash: Some(tx_hash.clone()),
+                }).unwrap();
+                state.broadcast("wallet", &ws_msg).await;
+                
+                log::info!("[API] ✅ Transfer confirmed: {} KARA to {}", amount, recipient);
+                
+                Ok((tx_hash, format!("Sent {} KARA to {}", amount, recipient)))
+            } else {
+                Err("Transfer data missing".to_string())
+            }
+        }
+        _ => {
+            // For other action types, just acknowledge
+            log::info!("[API] ✅ Action {:?} confirmed", action.action_type);
+            Ok((uuid::Uuid::new_v4().to_string(), format!("{:?} action completed", action.action_type)))
+        }
+    };
+    
+    match result {
+        Ok((tx_hash, message)) => {
+            (StatusCode::OK, Json(ApiResponse::success(ConfirmActionResponse {
+                success: true,
+                tx_hash: Some(tx_hash),
+                message,
+            })))
+        }
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, Json(ApiResponse::<ConfirmActionResponse>::error(e)))
+        }
+    }
+}
+
+// ============================================================================
+// Manifest Handlers (AR Whispers / Haptic)
+// ============================================================================
+
+/// Get current manifest state (active whispers, last haptic)
+pub async fn get_manifest_state(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let manifest = state.get_manifest_state().await;
+    
+    log::debug!("[API] 👁️ Manifest state: {} whispers, haptic: {:?}",
+        manifest.whispers.len(), manifest.last_haptic);
+    
+    (StatusCode::OK, Json(ApiResponse::success(manifest)))
+}
+
+/// Clear all whispers
+pub async fn clear_manifest(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    state.clear_whispers().await;
+    
+    log::info!("[API] 🧹 Manifest cleared");
+    
+    (StatusCode::OK, Json(ApiResponse::success("Manifest cleared")))
+}
+
+// ============================================================================
+// Helper Functions for OracleVeil → API Response Conversion
+// ============================================================================
+
+use crate::oracle::command::CommandData;
+
+/// Infer IntentType from CommandData
+fn infer_intent_type_from_data(data: &Option<CommandData>) -> IntentType {
+    match data {
+        Some(CommandData::TxHash(_)) => IntentType::Transfer,
+        Some(CommandData::Balance(_)) => IntentType::Wallet,
+        Some(CommandData::BlockData(_)) => IntentType::Wallet,
+        Some(CommandData::StoredHash(_)) => IntentType::TakeNote,
+        Some(CommandData::RetrievedData(_)) => IntentType::Wallet,
+        Some(CommandData::SearchResults(_)) => IntentType::Analyze,
+        Some(CommandData::MessageId(_)) => IntentType::Speak,
+        Some(CommandData::HapticPlayed) => IntentType::Speak,
+        Some(CommandData::HardwareStatus(_)) => IntentType::Analyze,
+        Some(CommandData::PipelineStatus(_)) => IntentType::Analyze,
+        Some(CommandData::Text(_)) => IntentType::Speak,
+        _ => IntentType::Speak,
+    }
+}
+
+/// Convert CommandData to IntentData for API response
+fn convert_command_data_to_intent_data(data: &Option<CommandData>) -> Option<IntentData> {
+    match data {
+        Some(CommandData::TxHash(hash)) => {
+            Some(IntentData {
+                query: Some(format!("Transaction: {}", hash)),
+                amount: None,
+                recipient: None,
+                memo: None,
+                location: None,
+                duration: None,
+                app_type: None,
+                url: None,
+            })
+        }
+        Some(CommandData::Balance(balance)) => {
+            Some(IntentData {
+                query: Some(format!("{} KARA", balance)),
+                amount: Some(*balance as u64),
+                recipient: None,
+                memo: None,
+                location: None,
+                duration: None,
+                app_type: None,
+                url: None,
+            })
+        }
+        Some(CommandData::StoredHash(hash)) => {
+            Some(IntentData {
+                query: Some(format!("Stored: {}", hex::encode(hash))),
+                amount: None,
+                recipient: None,
+                memo: None,
+                location: None,
+                duration: None,
+                app_type: None,
+                url: None,
+            })
+        }
+        Some(CommandData::SearchResults(hits)) => {
+            let results: Vec<String> = hits.iter().map(|h| h.preview.clone()).collect();
+            Some(IntentData {
+                query: Some(results.join(", ")),
+                amount: None,
+                recipient: None,
+                memo: None,
+                location: None,
+                duration: None,
+                app_type: None,
+                url: None,
+            })
+        }
+        Some(CommandData::Text(text)) => {
+            Some(IntentData {
+                query: Some(text.clone()),
+                amount: None,
+                recipient: None,
+                memo: None,
+                location: None,
+                duration: None,
+                app_type: None,
+                url: None,
+            })
+        }
+        _ => None,
+    }
+}
+
+// ============================================================================
+// Use Case Handlers (Phase 2: Glasses-Ready Use Cases)
+// ============================================================================
+
+/// Execute a use case (productivity, health, social, navigation)
+pub async fn execute_use_case(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<UseCaseRequest>,
+) -> impl IntoResponse {
+    use crate::oracle::UseCaseDispatcher;
+    
+    log::info!("[API] 📱 Use case: {} / {}", req.category, req.intent);
+    state.set_mode(OsMode::Oracle).await;
+    
+    let dispatcher = UseCaseDispatcher::new();
+    
+    match dispatcher.dispatch(&req.category, &req.intent, req.params.clone()).await {
+        Ok(manifest) => {
+            state.set_mode(OsMode::Idle).await;
+            
+            // Broadcast whisper
+            let whisper_id = state.add_whisper(
+                manifest.whisper.clone(),
+                if manifest.needs_confirmation { "emphasized" } else { "normal" },
+                "center",
+                Some(3000),
+            ).await;
+            
+            state.broadcast_oracle_whisper(
+                &whisper_id,
+                &manifest.whisper,
+                if manifest.needs_confirmation { "emphasized" } else { "normal" },
+                "center",
+                3000,
+            ).await;
+            
+            // Broadcast haptic
+            let haptic_str = format!("{:?}", manifest.haptic).to_lowercase();
+            state.set_haptic(&haptic_str).await;
+            state.broadcast_oracle_haptic(&haptic_str, 1.0).await;
+            
+            // Convert overlay
+            let overlay_response = manifest.overlay.map(|o| AROverlayResponse {
+                content: o.content,
+                position: o.position,
+                duration_ms: o.duration_ms,
+                overlay_type: format!("{:?}", o.overlay_type).to_lowercase(),
+                style: format!("{:?}", o.style).to_lowercase(),
+            });
+            
+            // Check for generated files
+            let artifacts: Vec<String> = std::fs::read_dir("/tmp/karana")
+                .map(|entries| {
+                    entries
+                        .filter_map(|e| e.ok())
+                        .map(|e| e.path().display().to_string())
+                        .collect()
+                })
+                .unwrap_or_default();
+            
+            let response = UseCaseResponse {
+                success: true,
+                whisper: manifest.whisper,
+                haptic: haptic_str,
+                overlay: overlay_response,
+                confidence: manifest.confidence,
+                artifacts,
+            };
+            
+            log::info!("[API] 📱 Use case complete: {} (confidence: {:.0}%)", 
+                req.category, response.confidence * 100.0);
+            
+            (StatusCode::OK, Json(ApiResponse::success(response)))
+        }
+        Err(e) => {
+            state.set_mode(OsMode::Idle).await;
+            log::error!("[API] Use case failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiResponse::<UseCaseResponse>::error(e.to_string())))
+        }
+    }
+}
+

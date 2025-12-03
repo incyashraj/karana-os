@@ -171,7 +171,7 @@ pub struct DaStatusResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum WsMessage {
-    // Server -> Client
+    // ═══ Server -> Client: Wallet Events ═══
     WalletUpdate {
         balance: u64,
         last_tx_hash: Option<String>,
@@ -180,23 +180,75 @@ pub enum WsMessage {
         tx_hash: String,
         status: String,
     },
+    
+    // ═══ Server -> Client: Vision Events ═══
     VisionResult {
         request_id: String,
         result: VisionAnalysisResponse,
     },
+    
+    // ═══ Server -> Client: Oracle Events ═══
+    /// Oracle is processing (show thinking indicator)
+    OracleThinking {
+        intent: String,
+        stage: String,  // "parsing", "zk_proving", "executing", "manifesting"
+    },
+    
+    /// Oracle whisper (AR text overlay)
+    OracleWhisper {
+        id: String,
+        content: String,
+        style: String,      // "subtle", "emphasized", "urgent", "info", "success", "error"
+        position: String,   // "top_left", "top_right", "center", "bottom"
+        duration_ms: u64,
+    },
+    
+    /// Oracle haptic feedback
+    OracleHaptic {
+        pattern: String,    // "success", "confirm", "error", "attention", "thinking"
+        intensity: f32,     // 0.0 - 1.0
+    },
+    
+    /// Oracle requires confirmation
+    OracleConfirmation {
+        action_id: String,
+        action_type: String,
+        description: String,
+        expires_at: u64,
+        confidence: f32,
+    },
+    
+    /// Oracle completed intent processing
     OracleResponse {
         request_id: String,
         intent: OracleIntentResponse,
     },
+    
+    /// Oracle error
+    OracleError {
+        request_id: Option<String>,
+        error: String,
+        recoverable: bool,
+    },
+    
+    // ═══ Server -> Client: System Events ═══
     OsState {
         mode: String,
         battery: u8,
         connected: bool,
     },
     
-    // Client -> Server
+    /// System status update
+    SystemStatus {
+        ai_model: String,
+        zk_queue: usize,
+        swarm_peers: usize,
+        chain_height: u64,
+    },
+    
+    // ═══ Client -> Server ═══
     Subscribe {
-        channel: String, // "wallet", "transactions", "vision", "oracle"
+        channel: String, // "wallet", "transactions", "vision", "oracle", "system"
     },
     Unsubscribe {
         channel: String,
@@ -272,4 +324,125 @@ pub struct Transaction {
     pub status: String,        // "PENDING", "CONFIRMED", "FAILED"
     pub signature: Option<String>,
     pub da_tx_hash: Option<String>, // Celestia submission hash
+}
+
+// ============================================================================
+// Pending Confirmation Types
+// ============================================================================
+
+/// A pending action awaiting user confirmation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingAction {
+    /// Unique identifier for this pending action
+    pub id: String,
+    /// Type of action (TRANSFER, STAKE, VOTE, etc.)
+    pub action_type: IntentType,
+    /// Human-readable description of the action
+    pub description: String,
+    /// Structured data for the action
+    pub data: Option<IntentData>,
+    /// ZK proof of intent (base64 encoded)
+    pub zk_proof: Option<String>,
+    /// When this action was created (Unix timestamp)
+    pub created_at: u64,
+    /// When this action expires (Unix timestamp)
+    pub expires_at: u64,
+    /// Confidence level of the intent recognition
+    pub confidence: f32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfirmActionRequest {
+    /// ID of the pending action to confirm
+    pub action_id: String,
+    /// Whether to confirm (true) or reject (false)
+    pub approved: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConfirmActionResponse {
+    /// Whether the action was processed successfully
+    pub success: bool,
+    /// The resulting transaction hash (if approved)
+    pub tx_hash: Option<String>,
+    /// Response message
+    pub message: String,
+}
+
+// ============================================================================
+// Manifest Output Types (AR Whispers / Haptic)
+// ============================================================================
+
+/// Current manifest state for frontend rendering
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifestState {
+    /// Active whisper overlays
+    pub whispers: Vec<WhisperOverlay>,
+    /// Last haptic pattern played
+    pub last_haptic: Option<String>,
+    /// Output mode
+    pub mode: String,
+}
+
+/// A whisper overlay for AR display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WhisperOverlay {
+    /// Unique ID for this whisper
+    pub id: String,
+    /// Text content
+    pub content: String,
+    /// Style: "subtle", "emphasized", "urgent", "info", "success", "error"
+    pub style: String,
+    /// Position: "top_left", "top_right", "center", etc.
+    pub position: String,
+    /// Remaining duration in milliseconds (0 = permanent until dismissed)
+    pub remaining_ms: u64,
+}
+
+// ============================================================================
+// Use Case Types (Phase 2: Glasses Use Cases)
+// ============================================================================
+
+/// Request for use case execution
+#[derive(Debug, Clone, Deserialize)]
+pub struct UseCaseRequest {
+    /// Category: "productivity", "health", "social", "navigation"
+    pub category: String,
+    /// Specific intent within the category
+    pub intent: String,
+    /// Parameters for the use case
+    #[serde(default)]
+    pub params: serde_json::Value,
+}
+
+/// Response from use case execution
+#[derive(Debug, Clone, Serialize)]
+pub struct UseCaseResponse {
+    /// Success status
+    pub success: bool,
+    /// Whisper message for AR
+    pub whisper: String,
+    /// Haptic pattern to play
+    pub haptic: String,
+    /// AR overlay content (if any)
+    pub overlay: Option<AROverlayResponse>,
+    /// Confidence score
+    pub confidence: f32,
+    /// Generated files or artifacts
+    pub artifacts: Vec<String>,
+}
+
+/// AR overlay response
+#[derive(Debug, Clone, Serialize)]
+pub struct AROverlayResponse {
+    /// Content to display
+    pub content: String,
+    /// Position (x, y) normalized 0.0-1.0
+    pub position: (f32, f32),
+    /// Duration in ms (0 = persistent)
+    pub duration_ms: u64,
+    /// Overlay type: "whisper", "status", "navigation", "highlight", "progress"
+    pub overlay_type: String,
+    /// Style: "subtle", "normal", "emphasized"
+    pub style: String,
 }

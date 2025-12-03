@@ -1,3 +1,11 @@
+//! Kāraṇa OS - Zero-Knowledge Proof System
+//!
+//! This module provides ZK proofs for:
+//! - **Storage Proofs**: Prove data integrity without revealing content
+//! - **Intent Proofs**: Prove user authorization for Oracle commands
+//!
+//! All proofs use Groth16 on BLS12-381 via arkworks.
+
 use anyhow::Result;
 use ark_groth16::{Groth16, ProvingKey, prepare_verifying_key, PreparedVerifyingKey};
 use ark_bls12_381::{Bls12_381};
@@ -10,7 +18,16 @@ use std::path::Path;
 use std::collections::VecDeque;
 
 pub mod storage_proof;
+pub mod intent_proof;
+
 use storage_proof::StorageCircuit;
+
+// Re-export intent proof types
+pub use intent_proof::{
+    IntentType, IntentCommitment, IntentProof, IntentProofBundle,
+    QueryProof, RangeProof,
+    setup_intent_proofs, prove_intent_authorization, verify_intent_proof,
+};
 
 /// Phase 7.6: Proof batch for efficient proving
 #[derive(Debug)]

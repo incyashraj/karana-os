@@ -5,7 +5,7 @@ pub mod haptic;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use std::sync::{Arc, Mutex};
-use self::power::{PowerManager, PowerProfile};
+use self::power::{PowerManager, PowerProfile, GazeState, WakeReason};
 use self::input::MultimodalInput;
 use self::haptic::HapticEngine;
 
@@ -99,6 +99,18 @@ impl KaranaHardware {
                 let mut pm = self.power.lock().unwrap();
                 pm.set_profile(PowerProfile::Performance);
                 Ok("Switched to Performance Profile".to_string())
+            },
+            "power doze" => {
+                let mut pm = self.power.lock().unwrap();
+                pm.enter_doze();
+                Ok("Entered Doze Mode (wake on gaze/voice)".to_string())
+            },
+            "power stats" => {
+                let pm = self.power.lock().unwrap();
+                let stats = pm.get_stats();
+                Ok(format!("Power Stats: saved={:.1}mWh, batched={}, doze_cycles={}, gaze_wakes={}", 
+                    stats.energy_saved_mwh, stats.zk_proofs_batched, 
+                    stats.doze_cycles, stats.gaze_wakes))
             },
             "toggle charge" => {
                 let mut pm = self.power.lock().unwrap();

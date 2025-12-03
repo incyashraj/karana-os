@@ -52,6 +52,35 @@ impl Ledger {
         log::info!("Atom 4 (Economy): 💸 Transferred {} KARA from '{}' to '{}'", amount, sender, recipient);
         Ok(())
     }
+    
+    /// Debit (subtract) from an account's balance
+    pub fn debit(&mut self, account_id: &str, amount: u64) {
+        let mut account = self.get_account(account_id);
+        account.balance = account.balance.saturating_sub(amount as u128);
+        self.save_account(account_id, &account);
+        log::debug!("[LEDGER] Debited {} from {}", amount, account_id);
+    }
+    
+    /// Credit (add) to an account's balance
+    pub fn credit(&mut self, account_id: &str, amount: u64) {
+        let mut account = self.get_account(account_id);
+        account.balance += amount as u128;
+        self.save_account(account_id, &account);
+        log::debug!("[LEDGER] Credited {} to {}", amount, account_id);
+    }
+    
+    /// Unstake tokens
+    pub fn unstake(&mut self, account_id: &str, amount: u64) -> Result<()> {
+        let mut account = self.get_account(account_id);
+        if account.staked < amount as u128 {
+            return Err(anyhow::anyhow!("Insufficient staked balance"));
+        }
+        account.staked -= amount as u128;
+        account.balance += amount as u128;
+        self.save_account(account_id, &account);
+        log::info!("Atom 4 (Economy): 🔓 Node '{}' unstaked {} KARA.", account_id, amount);
+        Ok(())
+    }
 
     pub fn stake(&mut self, account_id: &str, amount: u128) -> Result<()> {
         let mut account = self.get_account(account_id);
@@ -126,11 +155,20 @@ impl ProofOfStorage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Proposal {
     pub id: u64,
+    pub title: String,
     pub description: String,
-    pub votes_for: u128,
-    pub votes_against: u128,
-    pub status: String, // "Active", "Passed", "Rejected"
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub status: ProposalStatus,
     pub ai_analysis: String,
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ProposalStatus {
+    Active,
+    Passed,
+    Rejected,
 }
 
 pub struct Governance {
@@ -173,11 +211,16 @@ impl Governance {
 
         let proposal = Proposal {
             id,
+            title: description.to_string(), // Use description as title for now
             description: description.to_string(),
             votes_for: 0,
             votes_against: 0,
-            status: "Active".to_string(),
+            status: ProposalStatus::Active,
             ai_analysis: analysis.trim().to_string(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         };
         
         self.save_proposal(&proposal);
@@ -199,15 +242,15 @@ impl Governance {
         }
 
         if let Some(mut proposal) = self.get_proposal(proposal_id) {
-            if proposal.status != "Active" {
+            if proposal.status != ProposalStatus::Active {
                 log::info!("Atom 4 (Governance): ⚠️ Proposal #{} is closed.", proposal_id);
                 return Ok(());
             }
 
             if approve {
-                proposal.votes_for += power;
+                proposal.votes_for += power as u64;
             } else {
-                proposal.votes_against += power;
+                proposal.votes_against += power as u64;
             }
             
             self.save_proposal(&proposal);
@@ -216,6 +259,22 @@ impl Governance {
              log::info!("Atom 4 (Governance): ⚠️ Proposal #{} not found.", proposal_id);
         }
         Ok(())
+    }
+    
+    /// Get all active proposals
+    pub fn get_active_proposals(&self) -> Vec<Proposal> {
+        let mut proposals = Vec::new();
+        
+        // Iterate through all proposals (simple approach)
+        for id in 1..self.next_id {
+            if let Some(p) = self.get_proposal(id) {
+                if p.status == ProposalStatus::Active {
+                    proposals.push(p);
+                }
+            }
+        }
+        
+        proposals
     }
 
     fn save_proposal(&self, proposal: &Proposal) {

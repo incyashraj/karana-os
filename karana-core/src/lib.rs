@@ -35,6 +35,9 @@ pub mod learning;
 pub mod memory;
 pub mod proactive;
 
+// Spatial AR system for persistent content
+pub mod spatial;
+
 // Simulator for testing without hardware
 pub mod simulator;
 

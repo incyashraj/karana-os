@@ -31,6 +31,7 @@ pub mod sensors;
 pub mod input;
 pub mod scenarios;
 pub mod tui;
+pub mod qemu;
 
 pub use device::VirtualGlasses;
 pub use display::{VirtualDisplay, DisplayLayer, ARElement};
@@ -38,6 +39,11 @@ pub use sensors::{VirtualSensors, SensorReading, GestureType};
 pub use input::{VirtualCamera, VirtualMicrophone, InputEvent};
 pub use scenarios::{Scenario, ScenarioEngine, ScenarioEvent};
 pub use tui::SimulatorTUI;
+pub use qemu::{
+    QemuConfig, QemuInstance, QemuRole, InstanceState,
+    SwarmConfig, SwarmController, SwarmStatus,
+    WebcamProxy, AdbBridge, QemuTestHarness, HarnessStatus,
+};
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

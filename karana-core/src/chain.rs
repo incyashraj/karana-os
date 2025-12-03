@@ -28,9 +28,83 @@ pub struct Transaction {
     /// Optional: public key for verification (hex encoded)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub public_key: Option<String>,
+    /// Transaction hash (computed)
+    #[serde(default)]
+    pub hash: String,
+    /// Timestamp
+    #[serde(default)]
+    pub timestamp: u64,
+}
+
+/// Transaction with additional metadata for querying
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionWithMeta {
+    pub hash: String,
+    pub from: String,
+    pub data: TransactionData,
+    pub timestamp: u64,
+}
+
+impl TransactionWithMeta {
+    /// Get recipient if this is a transfer
+    pub fn get_recipient(&self) -> Option<String> {
+        match &self.data {
+            TransactionData::Transfer { to, .. } => Some(to.clone()),
+            _ => None,
+        }
+    }
+    
+    /// Get amount if this is a transfer or stake
+    pub fn get_amount(&self) -> Option<u64> {
+        match &self.data {
+            TransactionData::Transfer { amount, .. } => Some(*amount as u64),
+            TransactionData::Stake { amount } => Some(*amount as u64),
+            _ => None,
+        }
+    }
 }
 
 impl Transaction {
+    /// Create a new transaction with computed hash
+    pub fn new(sender: String, data: TransactionData, nonce: u64, signature: Vec<u8>) -> Self {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        let mut tx = Self {
+            sender,
+            data,
+            signature: hex::encode(&signature),
+            nonce,
+            public_key: None,
+            hash: String::new(),
+            timestamp,
+        };
+        
+        // Compute hash
+        let hash_data = serde_json::to_vec(&tx).unwrap_or_default();
+        tx.hash = hex::encode(Sha256::digest(&hash_data));
+        tx
+    }
+    
+    /// Get recipient if this is a transfer
+    pub fn get_recipient(&self) -> Option<String> {
+        match &self.data {
+            TransactionData::Transfer { to, .. } => Some(to.clone()),
+            _ => None,
+        }
+    }
+    
+    /// Get amount if this is a transfer or stake
+    pub fn get_amount(&self) -> Option<u64> {
+        match &self.data {
+            TransactionData::Transfer { amount, .. } => Some(*amount as u64),
+            TransactionData::Stake { amount } => Some(*amount as u64),
+            _ => None,
+        }
+    }
+    
     /// Get the message bytes that should be signed
     pub fn signing_message(&self) -> Vec<u8> {
         let signing_data = serde_json::json!({
@@ -197,11 +271,80 @@ impl Block {
 pub struct Blockchain {
     ledger: Arc<Mutex<Ledger>>,
     gov: Arc<Mutex<Governance>>,
+    /// Block storage (in-memory for now)
+    blocks: Mutex<Vec<Block>>,
 }
 
 impl Blockchain {
     pub fn new(ledger: Arc<Mutex<Ledger>>, gov: Arc<Mutex<Governance>>) -> Self {
-        Self { ledger, gov }
+        // Create genesis block
+        let genesis = Block::new(
+            "0".repeat(64),
+            0,
+            "genesis".to_string(),
+            vec![],
+        );
+        
+        Self { 
+            ledger, 
+            gov,
+            blocks: Mutex::new(vec![genesis]),
+        }
+    }
+    
+    /// Get current chain height
+    pub fn height(&self) -> u64 {
+        let blocks = self.blocks.lock().unwrap();
+        blocks.last().map(|b| b.header.height).unwrap_or(0)
+    }
+    
+    /// Get the latest block
+    pub fn latest_block(&self) -> Block {
+        let blocks = self.blocks.lock().unwrap();
+        blocks.last().cloned().unwrap_or_else(|| Block::new("0".repeat(64), 0, "genesis".to_string(), vec![]))
+    }
+    
+    /// Get block by height
+    pub fn get_block(&self, height: u64) -> Option<Block> {
+        let blocks = self.blocks.lock().unwrap();
+        blocks.iter().find(|b| b.header.height == height).cloned()
+    }
+    
+    /// Add a new block to the chain
+    pub fn add_block(&self, block: Block) -> Result<()> {
+        let mut blocks = self.blocks.lock().unwrap();
+        let expected_height = blocks.last().map(|b| b.header.height + 1).unwrap_or(0);
+        
+        if block.header.height != expected_height {
+            return Err(anyhow::anyhow!("Invalid block height: expected {}, got {}", expected_height, block.header.height));
+        }
+        
+        blocks.push(block);
+        Ok(())
+    }
+    
+    /// Get transactions for a specific DID
+    pub fn get_transactions_for(&self, did: &str, limit: usize) -> Vec<TransactionWithMeta> {
+        let blocks = self.blocks.lock().unwrap();
+        let mut result = Vec::new();
+        
+        for block in blocks.iter().rev() {
+            for tx in &block.transactions {
+                if tx.sender == did || tx.get_recipient().as_deref() == Some(did) {
+                    result.push(TransactionWithMeta {
+                        hash: format!("0x{}", hex::encode(sha2::Sha256::digest(serde_json::to_vec(tx).unwrap_or_default()))[..16].to_string()),
+                        from: tx.sender.clone(),
+                        data: tx.data.clone(),
+                        timestamp: block.header.timestamp,
+                    });
+                    if result.len() >= limit {
+                        return result;
+                    }
+                }
+            }
+        }
+        
+        result
     }
 
     pub fn apply_block(&self, block: &Block) -> Result<()> {
@@ -251,6 +394,8 @@ impl Blockchain {
             signature: "attested".to_string(),
             nonce: timestamp,
             public_key: None, // Legacy attestation
+            hash: String::new(),
+            timestamp,
         }
     }
 }
@@ -265,6 +410,8 @@ pub fn create_signed_transaction(
         .unwrap()
         .as_secs();
     
+    let timestamp = nonce; // Use nonce as timestamp
+    
     // Create unsigned transaction first to get the message
     let mut tx = Transaction {
         sender: wallet.did().to_string(),
@@ -272,12 +419,18 @@ pub fn create_signed_transaction(
         signature: String::new(),
         nonce,
         public_key: Some(wallet.public_key_hex()),
+        hash: String::new(),
+        timestamp,
     };
     
     // Get message and sign it
     let message = tx.signing_message();
     let signature = wallet.sign(&message);
     tx.signature = hex::encode(signature.to_bytes());
+    
+    // Compute hash
+    let hash_data = serde_json::to_vec(&tx).unwrap_or_default();
+    tx.hash = hex::encode(Sha256::digest(&hash_data));
     
     tx
 }
@@ -363,6 +516,8 @@ mod tests {
             signature: "legacy_sig".to_string(),
             nonce: 12345,
             public_key: None,
+            hash: String::new(),
+            timestamp: 0,
         };
         
         // Should pass verification in legacy mode

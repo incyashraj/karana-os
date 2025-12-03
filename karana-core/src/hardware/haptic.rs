@@ -6,10 +6,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Phase 7.4: Haptic feedback patterns
 #[derive(Debug, Clone, Copy)]
 pub enum HapticPattern {
-    Success,      // Short double pulse
-    Error,        // Long pulse
-    Notification, // Gentle tap
-    Warning,      // Triple quick pulse
+    Success,      // Short double pulse - action completed
+    Error,        // Long pulse - error occurred
+    Notification, // Gentle tap - notification
+    Warning,      // Triple quick pulse - warning
+    Confirm,      // Double tap - confirmation needed
+    Attention,    // Escalating pulses - attention required
+    Thinking,     // Gentle repeating - processing
 }
 
 pub struct HapticEngine {
@@ -71,6 +74,9 @@ impl HapticEngine {
             HapticPattern::Error => ("━━━━━━━━", 400, 40000),
             HapticPattern::Notification => ("━", 50, 15000),
             HapticPattern::Warning => ("━ ━ ━", 80, 30000),
+            HapticPattern::Confirm => ("━━ ━━", 120, 28000),
+            HapticPattern::Attention => ("━ ━━ ━━━", 150, 35000),
+            HapticPattern::Thinking => ("• • •", 60, 12000),
         };
         
         self.vibrate(duration, intensity)?;

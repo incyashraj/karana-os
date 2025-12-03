@@ -31,4 +31,4 @@ pub mod handlers;
 pub mod types;
 pub mod state;
 
-pub use server::start_api_server;
+pub use server::{start_api_server, start_api_server_with_veil, start_api_server_with_state};

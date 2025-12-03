@@ -5,16 +5,48 @@
 //! - Executes blockchain transactions seamlessly
 //! - Controls AR apps and OS functions
 //! - Provides helpful, accurate responses
+//!
+//! ## Oracle Veil Architecture (v1.1)
+//! 
+//! The Oracle Veil is the SOLE user interface for Kāraṇa OS. There are no panels,
+//! no buttons, no cluttered UI—only the Oracle's whispers. All user interactions
+//! flow through the OracleVeil which:
+//! 
+//! 1. Receives multimodal input via `MultimodalSense` (voice, gaze, touch)
+//! 2. Processes intents through the AI engine with semantic understanding
+//! 3. Generates ZK proofs for any action affecting state
+//! 4. Sends commands to the Monad via typed channels
+//! 5. Returns minimal AR output via `MinimalManifest` (whispers, haptics)
 
+// Legacy modules (for backwards compatibility)
 mod intent;
 mod context;
 mod actions;
 mod conversation;
 
+// Oracle Veil v1.1 modules
+pub mod command;
+pub mod veil;
+pub mod sense;
+pub mod manifest;
+pub mod use_cases;
+
+// Legacy exports
 pub use intent::*;
 pub use context::*;
 pub use actions::*;
 pub use conversation::*;
+
+// Oracle Veil v1.1 exports
+pub use command::{
+    OracleCommand, CommandResult, CommandData,
+    OracleChannels, MonadChannels, COMMAND_BUFFER_SIZE,
+    TransactionPayload, ChainQuery, HapticPattern as CommandHapticPattern, AROverlay, WhisperStyle,
+};
+pub use veil::OracleVeil;
+pub use sense::MultimodalSense;
+pub use manifest::MinimalManifest;
+pub use use_cases::UseCaseDispatcher;
 
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};

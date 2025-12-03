@@ -52,6 +52,8 @@ fn test_blockchain_flow() {
         signature: "sig".to_string(),
         nonce: 1,
         public_key: None,
+        hash: "tx_hash_1".to_string(),
+        timestamp: timestamp as u64,
     };
 
     let block = Block::new(
@@ -78,6 +80,8 @@ fn test_blockchain_flow() {
         signature: "sig".to_string(),
         nonce: 2,
         public_key: None,
+        hash: "tx_hash_2".to_string(),
+        timestamp: timestamp as u64,
     };
 
     let block2 = Block::new(

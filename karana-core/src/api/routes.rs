@@ -23,6 +23,17 @@ pub fn create_routes(state: Arc<AppState>) -> Router {
         .route("/api/ai/vision", post(handlers::analyze_vision))
         .route("/api/ai/oracle", post(handlers::process_oracle))
         
+        // Use Case endpoints (Phase 2: Glasses-Ready)
+        .route("/api/use-case", post(handlers::execute_use_case))
+        
+        // Confirmation endpoints (for sensitive operations)
+        .route("/api/confirm/pending", get(handlers::get_pending_actions))
+        .route("/api/confirm/action", post(handlers::confirm_action))
+        
+        // Manifest endpoints (AR whispers / haptic output)
+        .route("/api/manifest", get(handlers::get_manifest_state))
+        .route("/api/manifest/clear", post(handlers::clear_manifest))
+        
         // Celestia DA endpoints
         .route("/api/da/submit", post(handlers::submit_to_da))
         .route("/api/da/status/{tx_hash}", get(handlers::get_da_status))
