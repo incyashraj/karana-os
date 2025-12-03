@@ -56,6 +56,9 @@ pub mod gaze;
 // Multimodal command fusion (voice + gesture + gaze)
 pub mod multimodal;
 
+// Scene understanding and spatial awareness
+pub mod scene;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
