@@ -13,8 +13,13 @@ iso/
 karana-core/models/*.safetensors
 karana-core/models/*.gguf
 
-# Planning docs
+# Planning docs - keep only README.md, SIMPLE_GUIDE.md, ARCHITECTURE.md
 DEVELOPMENT_PLAN.md
+DEVELOPMENT_PLAN_MASTER.md
+DEVELOPMENT_ROADMAP.md
 CRITICAL_GAPS_ANALYSIS.md
+ARCHITECTURE_ANALYSIS.md
+HARDWARE_PLAN.md
+PLAN_*.md
 *.plan.md
 TODO*.md
