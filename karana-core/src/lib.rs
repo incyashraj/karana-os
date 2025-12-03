@@ -38,6 +38,9 @@ pub mod proactive;
 // Spatial AR system for persistent content
 pub mod spatial;
 
+// AR Tabs - persistent floating tabs in space
+pub mod ar_tabs;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
