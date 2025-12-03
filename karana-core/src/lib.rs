@@ -50,6 +50,9 @@ pub mod collab;
 // Gesture recognition for hand tracking
 pub mod gesture;
 
+// Gaze/eye tracking system
+pub mod gaze;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
