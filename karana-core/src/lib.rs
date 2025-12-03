@@ -41,6 +41,9 @@ pub mod spatial;
 // AR Tabs - persistent floating tabs in space
 pub mod ar_tabs;
 
+// WebXR bridge for web content AR access
+pub mod webxr;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
