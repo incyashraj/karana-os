@@ -53,6 +53,9 @@ pub mod gesture;
 // Gaze/eye tracking system
 pub mod gaze;
 
+// Multimodal command fusion (voice + gesture + gaze)
+pub mod multimodal;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
