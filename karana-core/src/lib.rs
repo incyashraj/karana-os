@@ -68,6 +68,9 @@ pub mod haptics;
 // Power management system
 pub mod power;
 
+// Accessibility system
+pub mod accessibility;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
