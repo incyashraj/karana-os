@@ -71,6 +71,9 @@ pub mod power;
 // Accessibility system
 pub mod accessibility;
 
+// Settings & Preferences system
+pub mod settings;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
