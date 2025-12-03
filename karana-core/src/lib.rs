@@ -59,6 +59,9 @@ pub mod multimodal;
 // Scene understanding and spatial awareness
 pub mod scene;
 
+// Spatial audio for 3D sound
+pub mod audio;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
