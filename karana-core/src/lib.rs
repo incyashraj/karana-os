@@ -44,6 +44,9 @@ pub mod ar_tabs;
 // WebXR bridge for web content AR access
 pub mod webxr;
 
+// Multi-user collaboration
+pub mod collab;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
