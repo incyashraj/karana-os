@@ -28,6 +28,7 @@ use crate::oracle::command::{
 };
 use crate::oracle::{Oracle, OracleContext as LegacyContext, OracleIntent};
 use crate::oracle::manifest::MinimalManifest;
+use crate::oracle::tab_commands::TabCommandParser;
 use crate::zk::intent_proof::{
     setup_intent_proofs, prove_intent_authorization, verify_intent_proof,
     IntentProof as ZkIntentProof, IntentProofBundle,
@@ -50,6 +51,9 @@ pub struct OracleVeil {
     
     /// Legacy Oracle for NLP parsing (to be replaced by Phi-3)
     legacy_oracle: Arc<StdMutex<Oracle>>,
+    
+    /// Tab command parser for AR tab voice commands
+    tab_parser: TabCommandParser,
     
     /// Channel to send commands to Monad
     cmd_tx: mpsc::Sender<OracleCommand>,
@@ -329,7 +333,142 @@ impl IntentProver {
                     url: url.clone(),
                 }
             }
+            // AR Tab commands
+            IntentAction::TabPinBrowser { url, size, location } => {
+                OracleCommand::TabPinBrowser {
+                    url: url.clone(),
+                    size: Self::parse_size_hint(size),
+                    location_hint: location.clone(),
+                }
+            }
+            IntentAction::TabPinVideo { url, size, location } => {
+                OracleCommand::TabPinVideo {
+                    url: url.clone(),
+                    size: Self::parse_size_hint(size),
+                    location_hint: location.clone(),
+                }
+            }
+            IntentAction::TabPinWidget { widget_type, location } => {
+                OracleCommand::TabPinWidget {
+                    widget_type: Self::parse_widget_type(widget_type),
+                    size: crate::oracle::command::TabSizeHint::Medium,
+                    location_hint: location.clone(),
+                }
+            }
+            IntentAction::TabFocus { query } => {
+                OracleCommand::TabFocus { query: query.clone() }
+            }
+            IntentAction::TabClose { query } => {
+                OracleCommand::TabClose { query: query.clone() }
+            }
+            IntentAction::TabCloseLocation { location } => {
+                OracleCommand::TabCloseLocation { location: location.clone() }
+            }
+            IntentAction::TabList { location } => {
+                OracleCommand::TabList { location_filter: location.clone() }
+            }
+            IntentAction::TabMove { query, target } => {
+                OracleCommand::TabMove { 
+                    query: query.clone(), 
+                    target_location: target.clone() 
+                }
+            }
+            IntentAction::TabResize { query, size } => {
+                OracleCommand::TabResize { 
+                    query: query.clone(), 
+                    size: Self::parse_size_hint(size) 
+                }
+            }
+            IntentAction::TabSetLayout { location, layout } => {
+                OracleCommand::TabSetLayout { 
+                    location: location.clone(), 
+                    layout: Self::parse_layout_hint(layout) 
+                }
+            }
+            IntentAction::TabNavigate { action } => {
+                OracleCommand::TabNavigate { 
+                    action: Self::parse_nav_action(action) 
+                }
+            }
+            IntentAction::TabCycle { direction } => {
+                OracleCommand::TabCycle { 
+                    direction: Self::parse_cycle_direction(direction) 
+                }
+            }
             _ => OracleCommand::GetPipelineStatus,
+        }
+    }
+    
+    /// Parse string to TabSizeHint
+    fn parse_size_hint(s: &str) -> crate::oracle::command::TabSizeHint {
+        use crate::oracle::command::TabSizeHint;
+        match s.to_lowercase().as_str() {
+            "small" | "tiny" => TabSizeHint::Small,
+            "medium" | "normal" => TabSizeHint::Medium,
+            "large" | "big" => TabSizeHint::Large,
+            "full" | "huge" | "max" => TabSizeHint::Full,
+            _ => TabSizeHint::Medium,
+        }
+    }
+    
+    /// Parse string to WidgetType
+    fn parse_widget_type(s: &str) -> crate::oracle::command::WidgetType {
+        use crate::oracle::command::WidgetType;
+        match s.to_lowercase().as_str() {
+            "clock" | "time" => WidgetType::Clock,
+            "weather" => WidgetType::Weather,
+            "calendar" | "schedule" => WidgetType::Calendar,
+            "stocks" | "stock" => WidgetType::Stocks,
+            "music" | "player" => WidgetType::Music,
+            "timer" | "countdown" => WidgetType::Timer,
+            "todo" | "tasks" => WidgetType::Todo,
+            "status" | "battery" => WidgetType::SystemStatus,
+            "notifications" | "alerts" => WidgetType::Notifications,
+            "note" | "sticky" => WidgetType::StickyNote,
+            _ => WidgetType::Custom(s.to_string()),
+        }
+    }
+    
+    /// Parse string to TabLayoutHint
+    fn parse_layout_hint(s: &str) -> crate::oracle::command::TabLayoutHint {
+        use crate::oracle::command::TabLayoutHint;
+        match s.to_lowercase().as_str() {
+            "grid" => TabLayoutHint::Grid,
+            "stack" | "stacked" => TabLayoutHint::Stack,
+            "carousel" | "circle" => TabLayoutHint::Carousel,
+            "dock" | "docked" => TabLayoutHint::Dock,
+            _ => TabLayoutHint::Free,
+        }
+    }
+    
+    /// Parse string to TabNavAction
+    fn parse_nav_action(s: &str) -> crate::oracle::command::TabNavAction {
+        use crate::oracle::command::{TabNavAction, ScrollDirection, ScrollAmount};
+        match s.to_lowercase().as_str() {
+            "back" => TabNavAction::Back,
+            "forward" => TabNavAction::Forward,
+            "reload" | "refresh" => TabNavAction::Reload,
+            "play" | "pause" | "playpause" => TabNavAction::PlayPause,
+            "scroll_up" | "scrollup" => TabNavAction::Scroll { 
+                direction: ScrollDirection::Up, 
+                amount: ScrollAmount::Page 
+            },
+            "scroll_down" | "scrolldown" => TabNavAction::Scroll { 
+                direction: ScrollDirection::Down, 
+                amount: ScrollAmount::Page 
+            },
+            _ => TabNavAction::Reload, // Default action
+        }
+    }
+    
+    /// Parse string to TabCycleDirection
+    fn parse_cycle_direction(s: &str) -> crate::oracle::command::TabCycleDirection {
+        use crate::oracle::command::TabCycleDirection;
+        match s.to_lowercase().as_str() {
+            "next" => TabCycleDirection::Next,
+            "previous" | "prev" => TabCycleDirection::Previous,
+            "recent" | "last" => TabCycleDirection::Recent,
+            _ => TabCycleDirection::Next,
         }
     }
     
@@ -433,6 +572,32 @@ pub enum IntentAction {
     /// Open browser tab at position: "open youtube here"
     OpenSpatialTab { url: String },
     
+    // ═══ AR Tabs ═══
+    /// Pin a browser tab: "open youtube on the wall"
+    TabPinBrowser { url: String, size: String, location: Option<String> },
+    /// Pin a video tab: "pin netflix to the couch"
+    TabPinVideo { url: String, size: String, location: Option<String> },
+    /// Pin a widget: "show me a clock"
+    TabPinWidget { widget_type: String, location: Option<String> },
+    /// Focus a tab: "focus youtube"
+    TabFocus { query: String },
+    /// Close a tab: "close the video"
+    TabClose { query: Option<String> },
+    /// Close all tabs in location: "clear the wall"
+    TabCloseLocation { location: String },
+    /// List tabs: "show my tabs"
+    TabList { location: Option<String> },
+    /// Move tab: "move this to the desk"
+    TabMove { query: Option<String>, target: String },
+    /// Resize tab: "make this bigger"
+    TabResize { query: Option<String>, size: String },
+    /// Set layout: "grid layout"
+    TabSetLayout { location: Option<String>, layout: String },
+    /// Navigate within tab: "scroll down"
+    TabNavigate { action: String },
+    /// Cycle tabs: "next tab"
+    TabCycle { direction: String },
+    
     // ═══ Conversation ═══
     Conversation { response: String },
     Help,
@@ -459,6 +624,7 @@ impl OracleVeil {
         Ok(Self {
             ai,
             legacy_oracle: Arc::new(StdMutex::new(Oracle::new())),
+            tab_parser: TabCommandParser::new(),
             cmd_tx,
             result_rx: Arc::new(Mutex::new(result_rx)),
             context: Arc::new(RwLock::new(OracleVeilContext::default())),
@@ -656,7 +822,19 @@ impl OracleVeil {
         source: InputSource,
         timestamp: u64,
     ) -> Result<ParsedIntent> {
-        // Try AI-based parsing first (using local Phi-3 via Candle)
+        // 1. First try tab command parser (fast, specialized for AR tabs)
+        if let Some(tab_cmd) = self.tab_parser.parse(intent) {
+            let action = self.oracle_command_to_intent_action(&tab_cmd);
+            return Ok(ParsedIntent {
+                action,
+                confidence: 0.95, // High confidence for explicit tab commands
+                source,
+                timestamp,
+                raw: intent.to_string(),
+            });
+        }
+        
+        // 2. Try AI-based parsing (using local Phi-3 via Candle)
         let ai_result = {
             let mut ai = self.ai.lock().unwrap();
             ai.predict(intent, 100)
@@ -669,7 +847,7 @@ impl OracleVeil {
             }
         }
         
-        // Fallback to legacy Oracle parser
+        // 3. Fallback to legacy Oracle parser
         let legacy_response = {
             let mut oracle = self.legacy_oracle.lock().unwrap();
             let ctx = LegacyContext::default();
@@ -677,6 +855,135 @@ impl OracleVeil {
         };
         
         self.parse_legacy_response(&legacy_response, intent, source, timestamp)
+    }
+    
+    /// Convert OracleCommand (from tab parser) to IntentAction
+    fn oracle_command_to_intent_action(&self, cmd: &OracleCommand) -> IntentAction {
+        use crate::oracle::command::{TabSizeHint, WidgetType, TabLayoutHint, TabNavAction, TabCycleDirection};
+        
+        match cmd {
+            OracleCommand::TabPinBrowser { url, size, location_hint } => {
+                IntentAction::TabPinBrowser {
+                    url: url.clone(),
+                    size: Self::size_hint_to_string(size),
+                    location: location_hint.clone(),
+                }
+            }
+            OracleCommand::TabPinVideo { url, size, location_hint } => {
+                IntentAction::TabPinVideo {
+                    url: url.clone(),
+                    size: Self::size_hint_to_string(size),
+                    location: location_hint.clone(),
+                }
+            }
+            OracleCommand::TabPinWidget { widget_type, size: _, location_hint } => {
+                IntentAction::TabPinWidget {
+                    widget_type: Self::widget_type_to_string(widget_type),
+                    location: location_hint.clone(),
+                }
+            }
+            OracleCommand::TabFocus { query } => {
+                IntentAction::TabFocus { query: query.clone() }
+            }
+            OracleCommand::TabClose { query } => {
+                IntentAction::TabClose { query: query.clone() }
+            }
+            OracleCommand::TabCloseLocation { location } => {
+                IntentAction::TabCloseLocation { location: location.clone() }
+            }
+            OracleCommand::TabList { location_filter } => {
+                IntentAction::TabList { location: location_filter.clone() }
+            }
+            OracleCommand::TabMove { query, target_location } => {
+                IntentAction::TabMove {
+                    query: query.clone(),
+                    target: target_location.clone(),
+                }
+            }
+            OracleCommand::TabResize { query, size } => {
+                IntentAction::TabResize {
+                    query: query.clone(),
+                    size: Self::size_hint_to_string(size),
+                }
+            }
+            OracleCommand::TabSetLayout { location, layout } => {
+                IntentAction::TabSetLayout {
+                    location: location.clone(),
+                    layout: Self::layout_hint_to_string(layout),
+                }
+            }
+            OracleCommand::TabNavigate { action } => {
+                IntentAction::TabNavigate {
+                    action: Self::nav_action_to_string(action),
+                }
+            }
+            OracleCommand::TabCycle { direction } => {
+                IntentAction::TabCycle {
+                    direction: Self::cycle_direction_to_string(direction),
+                }
+            }
+            _ => IntentAction::Unknown { raw: format!("{:?}", cmd) },
+        }
+    }
+    
+    fn size_hint_to_string(size: &crate::oracle::command::TabSizeHint) -> String {
+        use crate::oracle::command::TabSizeHint;
+        match size {
+            TabSizeHint::Small => "small".to_string(),
+            TabSizeHint::Medium => "medium".to_string(),
+            TabSizeHint::Large => "large".to_string(),
+            TabSizeHint::Full => "full".to_string(),
+            TabSizeHint::Auto => "auto".to_string(),
+        }
+    }
+    
+    fn widget_type_to_string(wt: &crate::oracle::command::WidgetType) -> String {
+        use crate::oracle::command::WidgetType;
+        match wt {
+            WidgetType::Clock => "clock".to_string(),
+            WidgetType::Weather => "weather".to_string(),
+            WidgetType::Calendar => "calendar".to_string(),
+            WidgetType::Stocks => "stocks".to_string(),
+            WidgetType::Music => "music".to_string(),
+            WidgetType::Timer => "timer".to_string(),
+            WidgetType::Todo => "todo".to_string(),
+            WidgetType::SystemStatus => "status".to_string(),
+            WidgetType::Notifications => "notifications".to_string(),
+            WidgetType::StickyNote => "note".to_string(),
+            WidgetType::Custom(s) => s.clone(),
+        }
+    }
+    
+    fn layout_hint_to_string(layout: &crate::oracle::command::TabLayoutHint) -> String {
+        use crate::oracle::command::TabLayoutHint;
+        match layout {
+            TabLayoutHint::Free => "free".to_string(),
+            TabLayoutHint::Grid => "grid".to_string(),
+            TabLayoutHint::Stack => "stack".to_string(),
+            TabLayoutHint::Carousel => "carousel".to_string(),
+            TabLayoutHint::Dock => "dock".to_string(),
+        }
+    }
+    
+    fn nav_action_to_string(action: &crate::oracle::command::TabNavAction) -> String {
+        use crate::oracle::command::TabNavAction;
+        match action {
+            TabNavAction::Back => "back".to_string(),
+            TabNavAction::Forward => "forward".to_string(),
+            TabNavAction::Reload => "reload".to_string(),
+            TabNavAction::PlayPause => "playpause".to_string(),
+            TabNavAction::Scroll { direction, .. } => format!("scroll_{:?}", direction).to_lowercase(),
+            _ => "unknown".to_string(),
+        }
+    }
+    
+    fn cycle_direction_to_string(dir: &crate::oracle::command::TabCycleDirection) -> String {
+        use crate::oracle::command::TabCycleDirection;
+        match dir {
+            TabCycleDirection::Next => "next".to_string(),
+            TabCycleDirection::Previous => "previous".to_string(),
+            TabCycleDirection::Recent => "recent".to_string(),
+        }
     }
     
     /// Parse AI JSON response into ParsedIntent

@@ -30,6 +30,7 @@ pub mod veil;
 pub mod sense;
 pub mod manifest;
 pub mod use_cases;
+pub mod tab_commands;
 
 // Legacy exports
 pub use intent::*;

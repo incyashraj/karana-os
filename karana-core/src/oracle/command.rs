@@ -182,6 +182,114 @@ pub enum OracleCommand {
         query: String,
     },
     
+    // ═══════════════════════════════════════════════════════════════════════
+    // AR TAB COMMANDS - Persistent tabs pinned in space
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    /// Pin a browser tab at current gaze position
+    /// "Pin this browser here" / "Put YouTube on the wall"
+    TabPinBrowser {
+        url: String,
+        size: TabSizeHint,
+        location_hint: Option<String>,  // "desk", "wall", "kitchen"
+    },
+    
+    /// Pin a video player tab
+    /// "Pin this video here" / "Put Netflix on the couch"
+    TabPinVideo {
+        url: String,
+        size: TabSizeHint,
+        location_hint: Option<String>,
+    },
+    
+    /// Pin a code editor tab
+    /// "Show code here" / "Pin my editor to the desk"
+    TabPinCode {
+        file_path: String,
+        size: TabSizeHint,
+        location_hint: Option<String>,
+    },
+    
+    /// Pin a document/note tab
+    /// "Pin this document" / "Show notes here"
+    TabPinDocument {
+        content: String,
+        title: Option<String>,
+        size: TabSizeHint,
+        location_hint: Option<String>,
+    },
+    
+    /// Pin a widget (clock, weather, etc.)
+    /// "Show me a clock here" / "Put weather on the wall"
+    TabPinWidget {
+        widget_type: WidgetType,
+        size: TabSizeHint,
+        location_hint: Option<String>,
+    },
+    
+    /// Focus a specific tab by description
+    /// "Focus the YouTube tab" / "Show me the kitchen browser"
+    TabFocus {
+        query: String,  // Natural language: "youtube", "kitchen tab", "code editor"
+    },
+    
+    /// Minimize a tab
+    /// "Minimize this tab" / "Hide the browser"
+    TabMinimize {
+        query: Option<String>,  // None = currently focused tab
+    },
+    
+    /// Close a tab
+    /// "Close this tab" / "Remove the kitchen browser"
+    TabClose {
+        query: Option<String>,  // None = currently focused tab
+    },
+    
+    /// Close all tabs in a location
+    /// "Close all kitchen tabs" / "Clear the wall"
+    TabCloseLocation {
+        location: String,
+    },
+    
+    /// List all tabs (optionally filtered by location)
+    /// "Show my tabs" / "What's on my desk?"
+    TabList {
+        location_filter: Option<String>,
+    },
+    
+    /// Move a tab to a new location
+    /// "Move this to the desk" / "Put YouTube on the kitchen wall"
+    TabMove {
+        query: Option<String>,  // Which tab (None = focused)
+        target_location: String,
+    },
+    
+    /// Resize a tab
+    /// "Make this bigger" / "Shrink the video"
+    TabResize {
+        query: Option<String>,  // Which tab (None = focused)
+        size: TabSizeHint,
+    },
+    
+    /// Change tab layout in a location
+    /// "Arrange desk tabs in a grid" / "Stack the wall tabs"
+    TabSetLayout {
+        location: Option<String>,  // None = current location
+        layout: TabLayoutHint,
+    },
+    
+    /// Navigate within a browser tab
+    /// "Go back" / "Scroll down" / "Click the button"
+    TabNavigate {
+        action: TabNavAction,
+    },
+    
+    /// Switch to next/previous tab
+    /// "Next tab" / "Previous tab"
+    TabCycle {
+        direction: TabCycleDirection,
+    },
+    
     /// Remove an anchor
     SpatialRemoveAnchor {
         anchor_id: Option<u64>,
@@ -199,6 +307,139 @@ pub enum OracleCommand {
     SpatialOpenTab {
         url: String,
     },
+}
+
+// ============================================================================
+// AR TAB TYPES
+// ============================================================================
+
+/// Size hints for AR tabs (physical dimensions)
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TabSizeHint {
+    /// Post-it note size (~20cm x 15cm) - quick notes, small widgets
+    Small,
+    /// Clipboard size (~40cm x 30cm) - documents, small videos
+    Medium,
+    /// TV size (~80cm x 50cm) - browsers, videos, games
+    Large,
+    /// Wall size (~150cm x 100cm) - immersive content
+    Full,
+    /// Auto-size based on content
+    Auto,
+}
+
+impl Default for TabSizeHint {
+    fn default() -> Self {
+        TabSizeHint::Medium
+    }
+}
+
+/// Widget types for quick-access information
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum WidgetType {
+    /// Current time
+    Clock,
+    /// Weather forecast
+    Weather,
+    /// Calendar/schedule
+    Calendar,
+    /// Stock ticker
+    Stocks,
+    /// Music player controls
+    Music,
+    /// Timer/countdown
+    Timer,
+    /// Todo list
+    Todo,
+    /// Battery/system status
+    SystemStatus,
+    /// Notifications feed
+    Notifications,
+    /// Quick notes
+    StickyNote,
+    /// Custom widget by ID
+    Custom(String),
+}
+
+/// Tab layout modes for arranging multiple tabs
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TabLayoutHint {
+    /// Tabs placed freely where user puts them
+    Free,
+    /// Auto-arranged grid
+    Grid,
+    /// Overlapping stack (like cards)
+    Stack,
+    /// Circular carousel arrangement
+    Carousel,
+    /// Docked to edges of view
+    Dock,
+}
+
+impl Default for TabLayoutHint {
+    fn default() -> Self {
+        TabLayoutHint::Free
+    }
+}
+
+/// Navigation actions within a tab
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TabNavAction {
+    /// Go back in history
+    Back,
+    /// Go forward in history
+    Forward,
+    /// Reload current content
+    Reload,
+    /// Scroll in a direction
+    Scroll { direction: ScrollDirection, amount: ScrollAmount },
+    /// Click at a position (normalized 0.0-1.0)
+    Click { x: f32, y: f32 },
+    /// Navigate to a URL
+    GoTo { url: String },
+    /// Search/query
+    Search { query: String },
+    /// Zoom in/out
+    Zoom { factor: f32 },
+    /// Play/pause video
+    PlayPause,
+    /// Seek video
+    Seek { position_secs: f32 },
+    /// Volume control
+    Volume { level: f32 },
+}
+
+/// Scroll direction
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ScrollDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// Scroll amount
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ScrollAmount {
+    /// Small increment
+    Line,
+    /// Half page
+    HalfPage,
+    /// Full page
+    Page,
+    /// To top/bottom/left/right
+    End,
+}
+
+/// Tab cycle direction
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TabCycleDirection {
+    /// Next tab in focus order
+    Next,
+    /// Previous tab in focus order
+    Previous,
+    /// Most recently used tab
+    Recent,
 }
 
 // ============================================================================
@@ -457,6 +698,30 @@ pub enum CommandData {
     /// Spatial tab opened
     SpatialTabOpened { anchor_id: u64, url: String },
     
+    // ═══ AR Tab Results ═══
+    /// Tab was pinned successfully
+    TabPinned(TabInfo),
+    /// Tab was focused
+    TabFocused(TabInfo),
+    /// Tab was minimized
+    TabMinimized { tab_id: String },
+    /// Tab was closed
+    TabClosed { tab_id: String },
+    /// Multiple tabs closed
+    TabsCleared { count: usize, location: String },
+    /// List of tabs
+    TabList(Vec<TabInfo>),
+    /// Tab was moved
+    TabMoved { tab_id: String, new_location: String },
+    /// Tab was resized
+    TabResized { tab_id: String, new_size: String },
+    /// Layout was changed
+    TabLayoutChanged { location: String, layout: String },
+    /// Navigation action completed
+    TabNavigated { tab_id: String, action: String },
+    /// Tab cycle result
+    TabCycled(TabInfo),
+    
     // ═══ Generic ═══
     Empty,
     Text(String),
@@ -485,6 +750,37 @@ pub struct SpatialAnchorInfo {
     pub confidence: f32,
     /// When created
     pub created_at: u64,
+}
+
+/// AR Tab information for command results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabInfo {
+    /// Unique tab ID (UUID)
+    pub id: String,
+    /// Tab type (browser, video, code, document, widget)
+    pub tab_type: String,
+    /// Display title
+    pub title: String,
+    /// Icon/emoji for the tab
+    pub icon: String,
+    /// Current URL (for browser/video)
+    pub url: Option<String>,
+    /// Location hint where tab is pinned
+    pub location: String,
+    /// Current state (active, minimized, hidden)
+    pub state: String,
+    /// Physical size
+    pub size: String,
+    /// Distance from user (if known)
+    pub distance_m: Option<f32>,
+    /// Direction description
+    pub direction: Option<String>,
+    /// Whether this tab is currently focused
+    pub is_focused: bool,
+    /// When created
+    pub created_at: u64,
+    /// Last accessed
+    pub last_accessed: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

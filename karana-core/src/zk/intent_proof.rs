@@ -108,6 +108,23 @@ impl IntentType {
             OracleCommand::SpatialListAnchors => IntentType::Query,
             OracleCommand::SpatialOpenTab { .. } => IntentType::UserAction,
             
+            // AR Tab operations
+            OracleCommand::TabPinBrowser { .. } => IntentType::UserAction,
+            OracleCommand::TabPinVideo { .. } => IntentType::UserAction,
+            OracleCommand::TabPinCode { .. } => IntentType::UserAction,
+            OracleCommand::TabPinDocument { .. } => IntentType::UserAction,
+            OracleCommand::TabPinWidget { .. } => IntentType::UserAction,
+            OracleCommand::TabFocus { .. } => IntentType::UserAction,
+            OracleCommand::TabMinimize { .. } => IntentType::UserAction,
+            OracleCommand::TabClose { .. } => IntentType::UserAction,
+            OracleCommand::TabCloseLocation { .. } => IntentType::UserAction,
+            OracleCommand::TabList { .. } => IntentType::Query,
+            OracleCommand::TabMove { .. } => IntentType::UserAction,
+            OracleCommand::TabResize { .. } => IntentType::UserAction,
+            OracleCommand::TabSetLayout { .. } => IntentType::UserAction,
+            OracleCommand::TabNavigate { .. } => IntentType::UserAction,
+            OracleCommand::TabCycle { .. } => IntentType::UserAction,
+            
             // System operations
             OracleCommand::TriggerZKBatch => IntentType::System,
             OracleCommand::Shutdown => IntentType::System,
