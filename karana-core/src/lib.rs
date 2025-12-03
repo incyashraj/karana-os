@@ -47,6 +47,9 @@ pub mod webxr;
 // Multi-user collaboration
 pub mod collab;
 
+// Gesture recognition for hand tracking
+pub mod gesture;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
