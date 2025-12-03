@@ -164,8 +164,8 @@ fn main() {
         &format!("{}...", &user_did[..15])
     ));
     
-    // Set initial location context
-    oracle.set_location(Location::Home);
+    // Set initial location context (TODO: add location API to KaranaOracle)
+    // oracle.set_location(Location::Home);
     
     // Running flag
     let running = Arc::new(AtomicBool::new(true));

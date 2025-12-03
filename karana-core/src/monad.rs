@@ -33,6 +33,13 @@ use crate::oracle::{
     MultimodalSense, MinimalManifest,
     TransactionPayload, ChainQuery,
 };
+use crate::oracle::command::{
+    TabInfo, TabSizeHint, TabLayoutHint, TabNavAction, TabCycleDirection, WidgetType,
+    SpatialAnchorInfo,
+};
+use crate::ar_tabs::{TabManager, TabContent, TabSize};
+use crate::ar_tabs::tab::WidgetType as TabWidgetType;
+use crate::spatial::{SpatialAnchor, WorldPosition, AnchorContent, AnchorState, Quaternion};
 use crate::zk::setup_intent_proofs;
 
 /// Real output directory for intent actions
@@ -50,6 +57,7 @@ struct MonadBackend {
     mempool: Arc<Mutex<Vec<Transaction>>>,
     hardware: Arc<KaranaHardware>,
     wallet: Arc<Mutex<KaranaWallet>>,
+    tab_manager: Arc<Mutex<TabManager>>,
 }
 
 impl MonadBackend {
@@ -420,11 +428,331 @@ impl MonadBackend {
                 CommandResult::success(&cmd_id, CommandData::ShutdownAck)
             }
             
+            // ═══════════════════════════════════════════════════════════════════
+            // AR TAB COMMANDS
+            // ═══════════════════════════════════════════════════════════════════
+            
+            OracleCommand::TabPinBrowser { url, size, location_hint } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                let content = TabContent::browser(&url);
+                let tab_size = Self::convert_size_hint(&size);
+                let anchor = Self::create_anchor_at_gaze(&url);
+                
+                match tab_mgr.pin_tab(content, tab_size, anchor, location_hint.as_deref()) {
+                    Ok(id) => {
+                        let tab = tab_mgr.get_tab(id).unwrap();
+                        let info = Self::tab_to_info(tab);
+                        log::info!("[MONAD-BACKEND] Pinned browser tab: {} -> {}", url, id);
+                        CommandResult::success(&cmd_id, CommandData::TabPinned(info))
+                    }
+                    Err(e) => CommandResult::failure(&cmd_id, format!("Failed to pin tab: {:?}", e), true)
+                }
+            }
+            
+            OracleCommand::TabPinVideo { url, size, location_hint } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                let content = TabContent::video(&url, "Video");
+                let tab_size = Self::convert_size_hint(&size);
+                let anchor = Self::create_anchor_at_gaze(&url);
+                
+                match tab_mgr.pin_tab(content, tab_size, anchor, location_hint.as_deref()) {
+                    Ok(id) => {
+                        let tab = tab_mgr.get_tab(id).unwrap();
+                        let info = Self::tab_to_info(tab);
+                        log::info!("[MONAD-BACKEND] Pinned video tab: {} -> {}", url, id);
+                        CommandResult::success(&cmd_id, CommandData::TabPinned(info))
+                    }
+                    Err(e) => CommandResult::failure(&cmd_id, format!("Failed to pin tab: {:?}", e), true)
+                }
+            }
+            
+            OracleCommand::TabPinWidget { widget_type, size, location_hint } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                let tab_widget = Self::convert_widget_type(&widget_type);
+                let name = Self::widget_to_string(&widget_type);
+                let content = TabContent::widget(&name, tab_widget);
+                let tab_size = Self::convert_size_hint(&size);
+                let anchor = Self::create_anchor_at_gaze(&name);
+                
+                match tab_mgr.pin_tab(content, tab_size, anchor, location_hint.as_deref()) {
+                    Ok(id) => {
+                        let tab = tab_mgr.get_tab(id).unwrap();
+                        let info = Self::tab_to_info(tab);
+                        log::info!("[MONAD-BACKEND] Pinned widget: {:?}", widget_type);
+                        CommandResult::success(&cmd_id, CommandData::TabPinned(info))
+                    }
+                    Err(e) => CommandResult::failure(&cmd_id, format!("Failed to pin widget: {:?}", e), true)
+                }
+            }
+            
+            OracleCommand::TabFocus { query } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                // Find tab matching query
+                let found = tab_mgr.all_tabs()
+                    .find(|tab| {
+                        tab.title().to_lowercase().contains(&query.to_lowercase())
+                    })
+                    .map(|t| t.id);
+                
+                match found {
+                    Some(id) => {
+                        tab_mgr.focus(id);
+                        let tab = tab_mgr.get_tab(id).unwrap();
+                        let info = Self::tab_to_info(tab);
+                        CommandResult::success(&cmd_id, CommandData::TabFocused(info))
+                    }
+                    None => CommandResult::failure(&cmd_id, format!("No tab matching '{}'", query), true)
+                }
+            }
+            
+            OracleCommand::TabClose { query } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                
+                let id = if let Some(q) = query {
+                    // Find tab matching query
+                    tab_mgr.all_tabs()
+                        .find(|tab| tab.title().to_lowercase().contains(&q.to_lowercase()))
+                        .map(|t| t.id)
+                } else {
+                    // Close focused tab
+                    tab_mgr.get_focused().map(|t| t.id)
+                };
+                
+                match id {
+                    Some(id) => {
+                        let id_str = id.to_string();
+                        tab_mgr.close(id);
+                        CommandResult::success(&cmd_id, CommandData::TabClosed { tab_id: id_str })
+                    }
+                    None => CommandResult::failure(&cmd_id, "No tab to close", true)
+                }
+            }
+            
+            OracleCommand::TabMinimize { query } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                
+                let id = if let Some(q) = query {
+                    tab_mgr.all_tabs()
+                        .find(|tab| tab.title().to_lowercase().contains(&q.to_lowercase()))
+                        .map(|t| t.id)
+                } else {
+                    tab_mgr.get_focused().map(|t| t.id)
+                };
+                
+                match id {
+                    Some(id) => {
+                        tab_mgr.minimize(id);
+                        CommandResult::success(&cmd_id, CommandData::TabMinimized { tab_id: id.to_string() })
+                    }
+                    None => CommandResult::failure(&cmd_id, "No tab to minimize", true)
+                }
+            }
+            
+            OracleCommand::TabList { location_filter } => {
+                let tab_mgr = self.tab_manager.lock().unwrap();
+                let tabs: Vec<TabInfo> = tab_mgr.all_tabs()
+                    .filter(|tab| {
+                        if let Some(ref loc) = location_filter {
+                            tab.metadata.location_hint.contains(loc)
+                        } else {
+                            true
+                        }
+                    })
+                    .map(|tab| Self::tab_to_info(tab))
+                    .collect();
+                
+                log::info!("[MONAD-BACKEND] Listing {} tabs", tabs.len());
+                CommandResult::success(&cmd_id, CommandData::TabList(tabs))
+            }
+            
+            OracleCommand::TabCycle { direction } => {
+                let mut tab_mgr = self.tab_manager.lock().unwrap();
+                
+                match direction {
+                    TabCycleDirection::Next => {
+                        // Get all tab IDs
+                        let ids: Vec<_> = tab_mgr.all_tab_ids().collect();
+                        if ids.is_empty() {
+                            return CommandResult::failure(&cmd_id, "No tabs to cycle", true);
+                        }
+                        
+                        let current = tab_mgr.get_focused().map(|t| t.id);
+                        let next = if let Some(curr) = current {
+                            let pos = ids.iter().position(|&id| id == curr).unwrap_or(0);
+                            ids[(pos + 1) % ids.len()]
+                        } else {
+                            ids[0]
+                        };
+                        
+                        tab_mgr.focus(next);
+                        let tab = tab_mgr.get_tab(next).unwrap();
+                        CommandResult::success(&cmd_id, CommandData::TabCycled(Self::tab_to_info(tab)))
+                    }
+                    TabCycleDirection::Previous => {
+                        tab_mgr.focus_previous();
+                        match tab_mgr.get_focused() {
+                            Some(tab) => CommandResult::success(&cmd_id, CommandData::TabCycled(Self::tab_to_info(tab))),
+                            None => CommandResult::failure(&cmd_id, "No previous tab", true)
+                        }
+                    }
+                    TabCycleDirection::Recent => {
+                        tab_mgr.focus_previous();
+                        match tab_mgr.get_focused() {
+                            Some(tab) => CommandResult::success(&cmd_id, CommandData::TabCycled(Self::tab_to_info(tab))),
+                            None => CommandResult::failure(&cmd_id, "No recent tab", true)
+                        }
+                    }
+                }
+            }
+            
+            OracleCommand::TabNavigate { action } => {
+                // For now, just acknowledge the action
+                // Real implementation would send events to the tab's content renderer
+                let action_str = match &action {
+                    TabNavAction::Back => "back",
+                    TabNavAction::Forward => "forward",
+                    TabNavAction::Reload => "reload",
+                    TabNavAction::PlayPause => "playpause",
+                    TabNavAction::Scroll { direction, .. } => {
+                        match direction {
+                            crate::oracle::command::ScrollDirection::Up => "scroll_up",
+                            crate::oracle::command::ScrollDirection::Down => "scroll_down",
+                            crate::oracle::command::ScrollDirection::Left => "scroll_left",
+                            crate::oracle::command::ScrollDirection::Right => "scroll_right",
+                        }
+                    }
+                    _ => "unknown",
+                };
+                
+                let tab_mgr = self.tab_manager.lock().unwrap();
+                let tab_id = tab_mgr.get_focused()
+                    .map(|t| t.id.to_string())
+                    .unwrap_or_else(|| "none".to_string());
+                
+                log::info!("[MONAD-BACKEND] Tab navigate: {} on {}", action_str, tab_id);
+                CommandResult::success(&cmd_id, CommandData::TabNavigated { 
+                    tab_id, 
+                    action: action_str.to_string() 
+                })
+            }
+
             // Unimplemented commands
             _ => {
                 log::warn!("[MONAD-BACKEND] Unhandled command: {:?}", cmd);
                 CommandResult::failure(&cmd_id, "Command not implemented", false)
             }
+        }
+    }
+    
+    // ════════════════════════════════════════════════════════════════════════
+    // TAB HELPER FUNCTIONS
+    // ════════════════════════════════════════════════════════════════════════
+    
+    /// Convert TabSizeHint to TabSize
+    fn convert_size_hint(hint: &TabSizeHint) -> TabSize {
+        match hint {
+            TabSizeHint::Small => TabSize { width_m: 0.2, height_m: 0.15, depth_m: 0.01, aspect_ratio: 4.0/3.0, fov_fraction: 0.2 },
+            TabSizeHint::Medium => TabSize { width_m: 0.4, height_m: 0.3, depth_m: 0.01, aspect_ratio: 4.0/3.0, fov_fraction: 0.3 },
+            TabSizeHint::Large => TabSize { width_m: 0.8, height_m: 0.5, depth_m: 0.01, aspect_ratio: 16.0/10.0, fov_fraction: 0.5 },
+            TabSizeHint::Full => TabSize { width_m: 1.5, height_m: 1.0, depth_m: 0.01, aspect_ratio: 16.0/10.0, fov_fraction: 0.8 },
+            TabSizeHint::Auto => TabSize::default(),
+        }
+    }
+    
+    /// Create an anchor at current gaze position (stub for now)
+    fn create_anchor_at_gaze(label: &str) -> SpatialAnchor {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        SpatialAnchor {
+            id: rand::random::<u64>(),
+            position: WorldPosition::from_local(0.0, 1.5, -1.0), // ~1.5m in front
+            orientation: Quaternion::identity(),
+            visual_signature: [0u8; 32],
+            content_hash: [0u8; 32],
+            content: AnchorContent::Text { text: label.to_string() },
+            state: AnchorState::Active,
+            confidence: 0.9,
+            created_at: now,
+            updated_at: now,
+            owner_did: None,
+            label: Some(label.to_string()),
+        }
+    }
+    
+    /// Convert command WidgetType to ar_tabs WidgetType
+    fn convert_widget_type(wt: &WidgetType) -> TabWidgetType {
+        match wt {
+            WidgetType::Clock => TabWidgetType::Clock,
+            WidgetType::Weather => TabWidgetType::Weather,
+            WidgetType::Calendar => TabWidgetType::Calendar,
+            WidgetType::Timer => TabWidgetType::Timer,
+            WidgetType::Todo => TabWidgetType::Notes,
+            WidgetType::Stocks => TabWidgetType::StockTicker,
+            WidgetType::Notifications => TabWidgetType::SocialFeed,
+            _ => TabWidgetType::Custom,
+        }
+    }
+    
+    /// Convert WidgetType to string
+    fn widget_to_string(wt: &WidgetType) -> String {
+        match wt {
+            WidgetType::Clock => "Clock".to_string(),
+            WidgetType::Weather => "Weather".to_string(),
+            WidgetType::Calendar => "Calendar".to_string(),
+            WidgetType::Stocks => "Stocks".to_string(),
+            WidgetType::Music => "Music".to_string(),
+            WidgetType::Timer => "Timer".to_string(),
+            WidgetType::Todo => "Todo".to_string(),
+            WidgetType::SystemStatus => "System Status".to_string(),
+            WidgetType::Notifications => "Notifications".to_string(),
+            WidgetType::StickyNote => "Notes".to_string(),
+            WidgetType::Custom(s) => s.clone(),
+        }
+    }
+    
+    /// Convert ARTab to TabInfo for command results
+    fn tab_to_info(tab: &crate::ar_tabs::ARTab) -> TabInfo {
+        // Extract URL from content if available
+        let url = match &tab.content {
+            TabContent::Browser(b) => Some(b.url.clone()),
+            TabContent::VideoPlayer(v) => Some(v.url.clone()),
+            _ => None,
+        };
+        
+        // Get content type string
+        let tab_type = match &tab.content {
+            TabContent::Browser(_) => "browser",
+            TabContent::VideoPlayer(_) => "video",
+            TabContent::CodeEditor(_) => "code",
+            TabContent::Document(_) => "document",
+            TabContent::Game(_) => "game",
+            TabContent::Widget(_) => "widget",
+            TabContent::Custom(_) => "custom",
+        }.to_string();
+        
+        let location = if tab.metadata.location_hint.is_empty() {
+            "unknown".to_string()
+        } else {
+            tab.metadata.location_hint.clone()
+        };
+        
+        TabInfo {
+            id: tab.id.to_string(),
+            tab_type,
+            title: tab.title(),
+            icon: tab.icon().to_string(),
+            url,
+            location,
+            state: format!("{:?}", tab.state),
+            size: format!("{}x{}m", tab.size.width_m, tab.size.height_m),
+            distance_m: None,
+            direction: None,
+            is_focused: tab.state == crate::ar_tabs::TabState::Active,
+            created_at: tab.metadata.created_at,
+            last_accessed: tab.metadata.last_accessed,
         }
     }
 }
@@ -471,6 +799,8 @@ pub struct KaranaMonad {
     sense: Option<Arc<tokio::sync::Mutex<MultimodalSense>>>,
     /// Minimal manifest: whispers, haptics output
     manifest: Option<Arc<tokio::sync::Mutex<MinimalManifest>>>,
+    /// AR Tab Manager
+    tab_manager: Arc<Mutex<TabManager>>,
 }
 
 
@@ -685,6 +1015,7 @@ impl KaranaMonad {
                 mempool: self.mempool.clone(),
                 hardware: self.hardware.clone(),
                 wallet: self.wallet.clone(),
+                tab_manager: self.tab_manager.clone(),
             };
             
             // Spawn command processor
@@ -957,6 +1288,10 @@ impl KaranaMonad {
         log::info!("[ORACLE-VEIL] ✓ Multimodal sense: voice, gaze, touch (stub)");
         log::info!("[ORACLE-VEIL] ✓ Minimal manifest: whispers, haptics (stub)");
 
+        // AR Tab Manager
+        let tab_manager = Arc::new(Mutex::new(TabManager::new()));
+        log::info!("[AR-TABS] ✓ Tab manager initialized");
+
         Ok(Self {
             boot,
             runtime,
@@ -981,6 +1316,7 @@ impl KaranaMonad {
             monad_channels: Some(monad_channels),
             sense: Some(sense),
             manifest: Some(manifest),
+            tab_manager,
         })
     }
 
