@@ -65,6 +65,9 @@ pub mod audio;
 // Haptic feedback system
 pub mod haptics;
 
+// Power management system
+pub mod power;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
