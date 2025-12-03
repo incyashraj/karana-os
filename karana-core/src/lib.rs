@@ -62,6 +62,9 @@ pub mod scene;
 // Spatial audio for 3D sound
 pub mod audio;
 
+// Haptic feedback system
+pub mod haptics;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
