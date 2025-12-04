@@ -89,6 +89,9 @@ pub mod wellness;
 // Navigation & Maps
 pub mod navigation;
 
+// Social & Communication
+pub mod social;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
