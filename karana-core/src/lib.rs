@@ -80,6 +80,9 @@ pub mod networking;
 // Privacy & Security system
 pub mod privacy;
 
+// Advanced notifications system
+pub mod notifications_v2;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
