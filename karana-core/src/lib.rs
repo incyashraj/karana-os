@@ -92,6 +92,9 @@ pub mod navigation;
 // Social & Communication
 pub mod social;
 
+// App & Plugin Framework
+pub mod apps;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
