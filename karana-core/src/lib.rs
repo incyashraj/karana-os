@@ -77,6 +77,9 @@ pub mod settings;
 // Networking & Cloud Sync system
 pub mod networking;
 
+// Privacy & Security system
+pub mod privacy;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
