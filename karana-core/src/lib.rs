@@ -83,6 +83,9 @@ pub mod privacy;
 // Advanced notifications system
 pub mod notifications_v2;
 
+// Health & Wellness Monitoring
+pub mod wellness;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
