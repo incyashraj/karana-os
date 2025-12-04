@@ -74,6 +74,9 @@ pub mod accessibility;
 // Settings & Preferences system
 pub mod settings;
 
+// Networking & Cloud Sync system
+pub mod networking;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
