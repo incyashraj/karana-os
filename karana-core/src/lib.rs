@@ -95,6 +95,9 @@ pub mod social;
 // App & Plugin Framework
 pub mod apps;
 
+// Performance & Resource Optimization
+pub mod performance;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
