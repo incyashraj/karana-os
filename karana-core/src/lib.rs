@@ -86,6 +86,9 @@ pub mod notifications_v2;
 // Health & Wellness Monitoring
 pub mod wellness;
 
+// Navigation & Maps
+pub mod navigation;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
