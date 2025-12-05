@@ -108,6 +108,9 @@ pub mod ar;
 // Intelligence System
 pub mod intelligence;
 
+// Enhanced AI Layer for intelligent request handling
+pub mod ai_layer;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
