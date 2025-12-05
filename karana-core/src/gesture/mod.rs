@@ -8,6 +8,11 @@
 //! - Two-hand gestures (zoom, scale)
 //! - Finger tracking for cursor control
 //! - AR window interactions (pinch-to-close, swipe scroll)
+//! - Gaze-gesture integration (look-and-pinch, dwell selection)
+//! - Head gestures (nod, shake, tilt)
+//! - Micro-gestures (subtle finger taps, slides)
+//! - Custom gesture learning and recognition
+//! - Haptic feedback integration
 //!
 //! Privacy: All processing is local on-device via ORB cameras.
 
@@ -17,6 +22,11 @@ mod recognizer;
 mod gestures;
 pub mod finger_tracking;
 pub mod ar_interaction;
+pub mod gaze_gestures;
+pub mod head_gestures;
+pub mod micro_gestures;
+pub mod learning;
+pub mod haptics;
 
 pub use hand::*;
 pub use detector::*;
@@ -24,6 +34,11 @@ pub use recognizer::*;
 pub use gestures::*;
 pub use finger_tracking::*;
 pub use ar_interaction::*;
+pub use gaze_gestures::*;
+pub use head_gestures::*;
+pub use micro_gestures::*;
+pub use learning::*;
+pub use haptics::*;
 
 use std::collections::VecDeque;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
