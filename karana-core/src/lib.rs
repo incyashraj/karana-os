@@ -102,6 +102,9 @@ pub mod performance;
 // Voice Assistant Integration
 pub mod assistant;
 
+// AR Content Rendering
+pub mod ar;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
