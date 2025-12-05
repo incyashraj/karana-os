@@ -1,8 +1,5 @@
-pub mod gui;
-pub mod input;
-pub mod render_proof;
-pub mod theme;
-pub mod compositor;
+// These modules are siblings, not children. Use pub use instead.
+// They're declared in the parent mod.rs
 
 use actix::prelude::*;
 use crate::runtime::KaranaActor;
@@ -12,7 +9,7 @@ use crate::gov::KaranaDAO;
 use crate::market::KaranaBazaar;
 use crate::pkg::AppBundle;
 use crate::identity::KaranaIdentity;
-use crate::ui::compositor::ARCompositor;
+use super::compositor::ARCompositor;
 use std::sync::{Arc, Mutex, mpsc};
 use std::process::Command;
 use std::fs;
