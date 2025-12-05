@@ -6,6 +6,8 @@
 //! - Static gesture recognition (poses like pinch, point, thumbs up)
 //! - Dynamic gesture recognition (swipe, draw, rotate)
 //! - Two-hand gestures (zoom, scale)
+//! - Finger tracking for cursor control
+//! - AR window interactions (pinch-to-close, swipe scroll)
 //!
 //! Privacy: All processing is local on-device via ORB cameras.
 
@@ -13,11 +15,15 @@ mod hand;
 mod detector;
 mod recognizer;
 mod gestures;
+pub mod finger_tracking;
+pub mod ar_interaction;
 
 pub use hand::*;
 pub use detector::*;
 pub use recognizer::*;
 pub use gestures::*;
+pub use finger_tracking::*;
+pub use ar_interaction::*;
 
 use std::collections::VecDeque;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
