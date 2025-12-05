@@ -23,6 +23,7 @@ pub mod celestia;
 pub mod glasses;
 pub mod voice;
 pub mod camera;
+pub mod vision;
 pub mod timer;
 pub mod notifications;
 pub mod hud;
