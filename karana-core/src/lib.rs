@@ -98,6 +98,9 @@ pub mod apps;
 // Performance & Resource Optimization
 pub mod performance;
 
+// Voice Assistant Integration
+pub mod assistant;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
