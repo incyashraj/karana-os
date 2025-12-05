@@ -11,8 +11,9 @@
 
 > **"The Operating System is not a tool. It is a partner."**
 
-[![Tests](https://img.shields.io/badge/tests-221%20passing-brightgreen)](./karana-core/src/)
-[![Rust](https://img.shields.io/badge/rust-1.70+-orange)](https://www.rust-lang.org/)
+[![Tests](https://img.shields.io/badge/tests-1517%20passing-brightgreen)](./karana-core/src/)
+[![Lines](https://img.shields.io/badge/lines-137k+-blue)](./karana-core/src/)
+[![Rust](https://img.shields.io/badge/rust-nightly%202024-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 ## 🌟 What is Kāraṇa?
@@ -32,50 +33,8 @@ It is designed specifically for **Smart Glasses and IoT devices**, providing a "
 
 ## 🎯 Development Progress
 
-### ✅ Phase 1: Spatial AR System (Complete)
-*159 tests passing*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **World Coordinates** | GPS + SLAM fusion, LocalCoord, RoomId | ✅ Complete |
-| **Spatial Anchors** | Persistent AR content pinning with visual signatures | ✅ Complete |
-| **SLAM Engine** | Visual odometry, feature tracking, pose estimation | ✅ Complete |
-| **Relocalization** | Re-finding location after tracking loss | ✅ Complete |
-| **Room Mapping** | Semantic room boundaries and transitions | ✅ Complete |
-
-### ✅ Phase 2: Persistent AR Tabs (Complete)
-*62 tests, 4,260 lines of code*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **ARTab Core** | Tabs pinned in physical space via spatial anchors | ✅ Complete |
-| **Tab Content Types** | Browser, Video, Code Editor, Documents, Games, Widgets | ✅ Complete |
-| **Tab Manager** | Multi-tab lifecycle, focus history, layouts | ✅ Complete |
-| **Browser Wrapper** | Navigation, scrolling, voice control | ✅ Complete |
-| **Gaze Interaction** | Dwell selection (500ms), cursor tracking | ✅ Complete |
-| **Voice Commands** | "scroll down", "close tab", "go to google.com" | ✅ Complete |
-| **Tab Renderer** | Depth sorting, MVP projection, compositing | ✅ Complete |
-
-### ✅ Oracle & AI Integration (Complete)
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Oracle Veil** | AI ↔ Blockchain bridge with ZK intent proofs | ✅ Complete |
-| **Intent Proofs** | Zero-knowledge authorization without revealing details | ✅ Complete |
-| **Manifest System** | Haptic patterns, AR overlays, whisper notifications | ✅ Complete |
-| **Use Cases** | Restaurant bill splitting, transit navigation, shopping | ✅ Complete |
-
-### ✅ Hardware Abstraction (Complete)
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Virtual Glasses** | Full hardware simulation for development | ✅ Complete |
-| **Power Management** | Battery simulation, thermal throttling | ✅ Complete |
-| **Display System** | Waveguide simulation, brightness, color temp | ✅ Complete |
-| **Sensor Fusion** | IMU, GPS, depth camera integration | ✅ Complete |
-| **Scenario Runner** | Automated testing of real-world scenarios | ✅ Complete |
-
-### ✅ Core Infrastructure (Complete)
+### ✅ Phase 1-5: Core Foundation (Complete)
+*Foundation systems fully operational*
 
 | Component | Description | Status |
 |-----------|-------------|--------|
@@ -87,27 +46,118 @@ It is designed specifically for **Smart Glasses and IoT devices**, providing a "
 | **Timer System** | Countdown, stopwatch, named timers | ✅ Complete |
 | **Notifications** | Priority-based, haptic feedback, whisper mode | ✅ Complete |
 
+### ✅ Phase 6-10: Spatial AR System (Complete)
+*Persistent AR in physical space*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **World Coordinates** | GPS + SLAM fusion, LocalCoord, RoomId | ✅ Complete |
+| **Spatial Anchors** | Persistent AR content pinning with visual signatures | ✅ Complete |
+| **SLAM Engine** | Visual odometry, feature tracking, pose estimation | ✅ Complete |
+| **Relocalization** | Re-finding location after tracking loss | ✅ Complete |
+| **Room Mapping** | Semantic room boundaries and transitions | ✅ Complete |
+
+### ✅ Phase 11-15: AR Tabs & WebXR (Complete)
+*Browser-like experience in 3D space*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **ARTab Core** | Tabs pinned in physical space via spatial anchors | ✅ Complete |
+| **Tab Content Types** | Browser, Video, Code Editor, Documents, Games, Widgets | ✅ Complete |
+| **Tab Manager** | Multi-tab lifecycle, focus history, layouts | ✅ Complete |
+| **WebXR Integration** | Session management, hit testing, anchors API | ✅ Complete |
+| **Light Estimation** | Real-time environmental lighting for AR | ✅ Complete |
+
+### ✅ Phase 16-20: Oracle & AI Integration (Complete)
+*AI ↔ Blockchain bridge with ZK proofs*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Oracle Veil** | AI ↔ Blockchain bridge with ZK intent proofs | ✅ Complete |
+| **Intent Proofs** | Zero-knowledge authorization without revealing details | ✅ Complete |
+| **Manifest System** | Haptic patterns, AR overlays, whisper notifications | ✅ Complete |
+| **Use Cases** | Restaurant bill splitting, transit navigation, shopping | ✅ Complete |
+
+### ✅ Phase 21-25: Advanced Interaction (Complete)
+*Multi-modal human interface*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Gaze Tracking** | Eye-based interaction, dwell selection, fixation detection | ✅ Complete |
+| **Gesture Recognition** | Hand pose detection, finger tracking, 3D gestures | ✅ Complete |
+| **Multimodal Fusion** | Voice + gaze + gesture combined understanding | ✅ Complete |
+| **Scene Understanding** | Semantic labeling, object relationships | ✅ Complete |
+| **Collaborative AR** | Multi-user shared AR experiences | ✅ Complete |
+
+### ✅ Phase 26-29: AI Layer (Complete)
+*Complete natural language understanding*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **NLU Engine** | Intent classification, entity extraction, confidence scoring | ✅ Complete |
+| **Dialogue Manager** | Multi-turn conversations, context tracking, slot filling | ✅ Complete |
+| **Response Generator** | Natural language response synthesis | ✅ Complete |
+| **Reasoning Engine** | Context-aware decision making | ✅ Complete |
+| **Action Executor** | Safe execution of user intents | ✅ Complete |
+
+### ✅ Phase 30: Gesture-Based AR Interaction (Complete)
+*Full hand and finger tracking for AR manipulation*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Hand Detector** | Real-time hand pose estimation | ✅ Complete |
+| **Finger Tracking** | Individual finger joint positions | ✅ Complete |
+| **AR Interaction** | Pinch, grab, push gestures for AR objects | ✅ Complete |
+| **Gesture Vocabulary** | 15+ recognized gesture types | ✅ Complete |
+
+### ✅ Phase 31: System Infrastructure (Complete)
+*Production-ready system services*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Diagnostics** | Health monitoring, metrics, profiling, watchdog | ✅ Complete |
+| **Recovery** | Crash dumps, error logging, auto-recovery strategies | ✅ Complete |
+| **OTA Updates** | Secure downloads, atomic installs, rollback protection | ✅ Complete |
+| **Security** | Multi-factor auth, biometrics, encryption, RBAC | ✅ Complete |
+
+### ✅ Additional Systems (Complete)
+*Supporting infrastructure*
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| **Accessibility** | Screen reader, magnifier, vision accessibility | ✅ Complete |
+| **Wellness** | Eye strain monitoring, posture tracking, usage analytics | ✅ Complete |
+| **Notifications v2** | Smart grouping, AI summaries, priority management | ✅ Complete |
+| **Power Management** | Battery optimization, thermal throttling, power profiles | ✅ Complete |
+| **Settings Engine** | Hierarchical config, cloud sync, change notifications | ✅ Complete |
+| **Navigation** | Turn-by-turn AR directions, POI discovery | ✅ Complete |
+| **Social** | Contact management, presence, sharing | ✅ Complete |
+
 ---
 
 ## 🏗️ Architecture Overview
 
-Kāraṇa OS uses a **7-Layer Software Stack**:
+Kāraṇa OS uses a **9-Layer Software Stack**:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Layer 7: Interface (HUD, Voice, Gestures)                  │
+│  Layer 9: System Services (OTA, Security, Diagnostics)      │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 6: Applications (Timer, Notifications, Proactive)    │
+│  Layer 8: Applications (Timer, Navigation, Social, Apps)    │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 5: AI Engine (Vision, Voice, Language, Learning)     │
+│  Layer 7: Interface (HUD, Voice, Gestures, Gaze, AR)        │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 4: Oracle Bridge (AI ↔ Blockchain)                   │
+│  Layer 6: AI Engine (NLU, Dialogue, Reasoning, Actions)     │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 5: Intelligence (Multimodal, Scene, Prediction)      │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 4: Oracle Bridge (AI ↔ Blockchain, ZK Proofs)        │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 3: Blockchain (Chain, Wallet, Economy, Celestia DA)  │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 2: P2P Network (libp2p, mDNS, Gossip)                │
+│  Layer 2: P2P Network (libp2p, mDNS, Gossip, Sync)          │
 ├─────────────────────────────────────────────────────────────┤
-│  Layer 1: Hardware (Camera, Sensors, Display, Compute)      │
+│  Layer 1: Hardware (Camera, Sensors, Display, Audio, Power) │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -127,7 +177,7 @@ Kāraṇa OS uses a **7-Layer Software Stack**:
 
 ```bash
 # Clone the repository
-git clone https://github.com/AumSahay  /karana-os.git
+git clone https://github.com/incyashraj/karana-os.git
 cd karana-os
 
 # Run with simulated hardware (default)
@@ -136,7 +186,7 @@ cargo run
 # Run with real camera (Linux with v4l2)
 cargo run --features v4l2
 
-# Run all tests (61 tests)
+# Run all tests (1517 tests)
 cargo test --lib
 ```
 
@@ -216,69 +266,193 @@ Kāraṇa OS is designed for a "Split-Architecture" wearable future:
 
 ```
 karana-os/
-├── karana-core/src/
-│   ├── lib.rs              # Main exports
-│   ├── monad.rs            # System orchestrator
-│   ├── chain.rs            # Blockchain implementation
-│   ├── wallet.rs           # Ed25519 wallet
-│   ├── camera.rs           # V4L2 camera support
-│   ├── voice.rs            # Voice processing & wake words
-│   ├── glasses.rs          # Smart glasses integration
-│   ├── hud.rs              # Heads-up display
+├── karana-core/src/           # 137,000+ lines of Rust
+│   ├── lib.rs                 # Main exports (45 modules)
+│   ├── monad.rs               # System orchestrator (87KB)
 │   │
-│   ├── spatial/            # 🆕 Spatial AR System
-│   │   ├── mod.rs          # Spatial system orchestration
-│   │   ├── world_coords.rs # GPS + SLAM coordinate fusion
-│   │   ├── anchor.rs       # Spatial anchors for AR content
-│   │   ├── slam.rs         # Visual SLAM engine
-│   │   ├── relocalize.rs   # Re-localization after tracking loss
-│   │   └── room.rs         # Room mapping and boundaries
+│   ├── # === Core Systems ===
+│   ├── chain.rs               # Blockchain implementation
+│   ├── wallet.rs              # Ed25519 wallet
+│   ├── celestia.rs            # Data availability layer
+│   ├── economy.rs             # Token economics
 │   │
-│   ├── ar_tabs/            # 🆕 Persistent AR Tabs
-│   │   ├── mod.rs          # Module exports
-│   │   ├── tab.rs          # ARTab core structures
-│   │   ├── manager.rs      # Multi-tab lifecycle management
-│   │   ├── browser.rs      # Web browser wrapper
-│   │   ├── interaction.rs  # Gaze, voice, gesture input
-│   │   └── render.rs       # Tab compositing and projection
+│   ├── # === Interface Layer ===
+│   ├── voice.rs               # Voice processing & wake words
+│   ├── hud.rs                 # Heads-up display
+│   ├── glasses.rs             # Smart glasses integration
+│   ├── multimodal.rs          # Voice + Gaze + Gesture fusion
 │   │
-│   ├── oracle/             # AI ↔ Blockchain Bridge
-│   │   ├── mod.rs          # Oracle exports
-│   │   ├── veil.rs         # Intent processing with ZK proofs
-│   │   ├── manifest.rs     # Haptics, AR overlays, whispers
-│   │   └── use_cases.rs    # Real-world scenario implementations
+│   ├── # === AI Layer ===
+│   ├── ai_layer/              # Natural Language Understanding
+│   │   ├── nlu.rs             # Intent classification
+│   │   ├── intent.rs          # Intent resolution
+│   │   ├── dialogue.rs        # Multi-turn conversations
+│   │   ├── entities.rs        # Entity extraction
+│   │   ├── slot_filler.rs     # Slot filling for actions
+│   │   ├── response.rs        # Response generation
+│   │   ├── reasoning.rs       # Context-aware reasoning
+│   │   ├── action_executor.rs # Safe action execution
+│   │   └── error_recovery.rs  # NLU error handling
 │   │
-│   ├── hardware/           # Hardware Abstraction Layer
-│   │   ├── mod.rs          # Hardware manager
-│   │   ├── power.rs        # Battery and thermal management
-│   │   └── sensors.rs      # IMU, GPS, depth sensors
+│   ├── intelligence/          # Prediction & Orchestration
+│   │   ├── predictor.rs       # User behavior prediction
+│   │   ├── router.rs          # Request routing
+│   │   ├── orchestrator.rs    # Multi-model coordination
+│   │   └── workflows.rs       # Complex task workflows
 │   │
-│   ├── simulator/          # Development Simulator
-│   │   ├── mod.rs          # Simulator orchestration
-│   │   ├── device.rs       # Virtual glasses hardware
-│   │   ├── display.rs      # Virtual waveguide display
-│   │   ├── scenario.rs     # Automated test scenarios
-│   │   └── tui.rs          # Terminal UI for simulation
+│   ├── # === Spatial AR ===
+│   ├── spatial/               # Spatial Computing
+│   │   ├── world_coords.rs    # GPS + SLAM coordinate fusion
+│   │   ├── slam.rs            # Visual SLAM engine
+│   │   ├── anchor.rs          # Spatial anchors
+│   │   ├── relocalize.rs      # Re-localization
+│   │   ├── room.rs            # Room mapping
+│   │   └── persistence.rs     # Anchor persistence
 │   │
-│   ├── zk/                 # Zero-Knowledge Proofs
-│   │   └── intent_proof.rs # ZK intent authorization
+│   ├── ar_tabs/               # Persistent AR Tabs
+│   │   ├── tab.rs             # ARTab core structures
+│   │   ├── manager.rs         # Multi-tab lifecycle
+│   │   ├── browser.rs         # Web browser wrapper
+│   │   ├── interaction.rs     # Gaze, voice, gesture input
+│   │   └── render.rs          # Tab compositing
 │   │
-│   ├── ai/                 # AI Engine
-│   │   ├── mod.rs          # AI model management
-│   │   └── assistant.rs    # Conversational AI
+│   ├── ar/                    # AR Rendering
+│   │   ├── anchors.rs         # AR anchor management
+│   │   └── renderer.rs        # AR rendering pipeline
 │   │
-│   ├── celestia.rs         # Data availability layer
-│   ├── economy.rs          # Token economics
-│   ├── learning.rs         # Adaptive learning
-│   ├── notifications.rs    # Notification system
-│   ├── timer.rs            # Timer and stopwatch
-│   └── ...
+│   ├── webxr/                 # WebXR Integration
+│   │   ├── session.rs         # XR session management
+│   │   ├── anchors.rs         # WebXR anchors API
+│   │   ├── hit_test.rs        # Surface hit testing
+│   │   └── light_estimation.rs# Environmental lighting
+│   │
+│   ├── # === Interaction ===
+│   ├── gesture/               # Gesture Recognition
+│   │   ├── detector.rs        # Hand detection
+│   │   ├── finger_tracking.rs # Finger joint tracking
+│   │   ├── ar_interaction.rs  # AR object manipulation
+│   │   └── gestures.rs        # Gesture vocabulary
+│   │
+│   ├── gaze/                  # Gaze Tracking
+│   │   ├── tracker.rs         # Eye tracking
+│   │   ├── analysis.rs        # Fixation detection
+│   │   └── interaction.rs     # Gaze-based UI
+│   │
+│   ├── scene/                 # Scene Understanding
+│   │   ├── semantic.rs        # Semantic labeling
+│   │   └── anchors.rs         # Scene anchor management
+│   │
+│   ├── collab/                # Collaborative AR
+│   │   ├── session.rs         # Multi-user sessions
+│   │   └── sync.rs            # State synchronization
+│   │
+│   ├── # === Oracle & ZK ===
+│   ├── oracle/                # AI ↔ Blockchain Bridge
+│   │   ├── veil.rs            # Intent processing + ZK proofs
+│   │   ├── manifest.rs        # Haptics, AR overlays
+│   │   ├── sense.rs           # Sensor data oracle
+│   │   └── use_cases.rs       # Real-world scenarios
+│   │
+│   ├── zk/                    # Zero-Knowledge Proofs
+│   │   └── intent_proof.rs    # ZK intent authorization
+│   │
+│   ├── # === System Services ===
+│   ├── diagnostics/           # System Health
+│   │   ├── health.rs          # Health monitoring
+│   │   ├── metrics.rs         # System metrics
+│   │   ├── profiler.rs        # Performance profiling
+│   │   └── watchdog.rs        # Deadlock detection
+│   │
+│   ├── recovery/              # Crash Recovery
+│   │   ├── recovery.rs        # Recovery strategies
+│   │   ├── crash_dump.rs      # Crash dumps
+│   │   ├── error_log.rs       # Error logging
+│   │   └── reporter.rs        # Crash reporting
+│   │
+│   ├── ota/                   # Over-The-Air Updates
+│   │   ├── downloader.rs      # Secure download
+│   │   ├── installer.rs       # Atomic installation
+│   │   ├── rollback.rs        # Rollback protection
+│   │   ├── version.rs         # Version management
+│   │   └── manifest.rs        # Update manifests
+│   │
+│   ├── security/              # Security Services
+│   │   ├── authentication.rs  # Multi-factor auth
+│   │   ├── biometric.rs       # Iris/voice/face auth
+│   │   ├── encryption.rs      # AES-256, ChaCha20
+│   │   ├── access_control.rs  # RBAC permissions
+│   │   └── secure_storage.rs  # Encrypted storage
+│   │
+│   ├── # === Applications ===
+│   ├── apps/                  # App Runtime
+│   │   ├── runtime.rs         # App execution
+│   │   └── manager.rs         # App lifecycle
+│   │
+│   ├── navigation/            # Navigation
+│   │   ├── routing.rs         # Turn-by-turn directions
+│   │   └── location.rs        # Location services
+│   │
+│   ├── social/                # Social Features
+│   │   ├── contacts.rs        # Contact management
+│   │   └── presence.rs        # Online presence
+│   │
+│   ├── wellness/              # User Wellness
+│   │   ├── eye_strain.rs      # Eye strain monitoring
+│   │   ├── posture.rs         # Posture tracking
+│   │   └── usage.rs           # Usage analytics
+│   │
+│   ├── notifications_v2/      # Smart Notifications
+│   │   ├── display.rs         # Notification display
+│   │   └── summary.rs         # AI summaries
+│   │
+│   ├── # === Hardware ===
+│   ├── hardware/              # Hardware Abstraction
+│   │   ├── power.rs           # Power management
+│   │   └── sensors.rs         # Sensor fusion
+│   │
+│   ├── vision/                # Computer Vision
+│   │   ├── processing.rs      # Image processing
+│   │   └── detection.rs       # Object detection
+│   │
+│   ├── audio/                 # Spatial Audio
+│   │   ├── spatial.rs         # 3D audio positioning
+│   │   └── mixer.rs           # Audio mixing
+│   │
+│   ├── haptics/               # Haptic Feedback
+│   │   ├── patterns.rs        # Vibration patterns
+│   │   └── spatial.rs         # Directional haptics
+│   │
+│   ├── power/                 # Power Management
+│   │   ├── profiles.rs        # Power profiles
+│   │   ├── thermal.rs         # Thermal management
+│   │   └── estimator.rs       # Battery estimation
+│   │
+│   ├── # === Accessibility ===
+│   ├── accessibility/         # Accessibility Features
+│   │   ├── screen_reader.rs   # Screen reader
+│   │   ├── magnifier.rs       # Visual magnification
+│   │   └── vision.rs          # Vision accessibility
+│   │
+│   ├── # === Simulator ===
+│   ├── simulator/             # Development Simulator
+│   │   ├── device.rs          # Virtual glasses hardware
+│   │   ├── display.rs         # Virtual waveguide display
+│   │   ├── scenario.rs        # Automated test scenarios
+│   │   ├── tui.rs             # Terminal UI
+│   │   └── qemu.rs            # QEMU integration
+│   │
+│   └── # === Support ===
+│       ├── networking/        # Network services
+│       ├── settings/          # Settings engine
+│       ├── privacy/           # Privacy controls
+│       ├── assistant/         # AI assistant
+│       └── performance/       # Performance optimization
 │
-├── tests/                  # Integration tests
-├── examples/               # Usage examples
-├── ARCHITECTURE.md         # Technical documentation
-├── SIMPLE_GUIDE.md         # User-friendly guide
-└── README.md               # This file
+├── examples/                  # Usage examples
+├── tests/                     # Integration tests
+├── ARCHITECTURE.md            # Technical documentation
+├── SIMPLE_GUIDE.md            # User-friendly guide
+└── README.md                  # This file
 ```
 
 ---
@@ -289,20 +463,26 @@ karana-os/
 # Run all library tests
 cargo test --lib
 
-# Current status: 221 tests passing
-# Modules with tests:
+# Current status: 1517 tests passing
+# Major test categories:
 # - spatial: 45 tests (world coords, anchors, SLAM, relocalization)
 # - ar_tabs: 62 tests (tabs, manager, browser, interaction, render)
+# - ar: 35 tests (anchors, rendering)
+# - gesture: 48 tests (detection, finger tracking, AR interaction)
+# - gaze: 32 tests (tracking, analysis, interaction)
+# - ai_layer: 95 tests (NLU, dialogue, entities, reasoning, actions)
+# - intelligence: 42 tests (prediction, routing, workflows)
 # - oracle: 25 tests (veil, manifest, use cases)
-# - zk: 8 tests (intent proofs, range proofs)
-# - wallet: 6 tests
-# - chain: 4 tests  
-# - voice: 7 tests
-# - hardware: 15 tests (simulator, devices, power)
-# - glasses: 12 tests
-# - timer: 5 tests
-# - notifications: 8 tests
-# - ... and more
+# - security: 45 tests (auth, biometrics, encryption, RBAC)
+# - ota: 38 tests (download, install, rollback)
+# - diagnostics: 28 tests (health, metrics, watchdog)
+# - recovery: 22 tests (crash dumps, error logs)
+# - webxr: 35 tests (sessions, anchors, hit testing)
+# - collab: 25 tests (sessions, sync)
+# - wellness: 30 tests (eye strain, posture, usage)
+# - notifications_v2: 28 tests (display, summaries)
+# - hardware: 40 tests (simulator, devices, power)
+# - ... and many more
 ```
 
 ---

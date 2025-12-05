@@ -6,11 +6,21 @@
 
 ## What is Kāraṇa OS?
 
-**Kāraṇa OS** is an operating system for smart glasses that puts **you** in control. Unlike other smart devices that send your data to big tech companies, Kāraṇa keeps everything on your device.
+**Kāraṇa OS** is a complete operating system for smart glasses with **137,000+ lines of code** and **1,517 automated tests**. It's designed to give **you** full control over your data and experience.
 
 Think of it like this:
 - **Siri/Alexa/Google** = Your data goes to their servers, they control everything
 - **Kāraṇa** = Everything stays on your glasses, you own your data
+
+### What's Inside?
+
+| Category | Features |
+|----------|----------|
+| **AI** | Voice recognition, intent understanding, natural conversations |
+| **AR** | Spatial anchors, persistent tabs, hand tracking, gaze control |
+| **Security** | Biometric auth (iris, voice, face), encryption, secure storage |
+| **Blockchain** | Digital wallet, signed transactions, decentralized identity |
+| **System** | OTA updates, crash recovery, diagnostics, power management |
 
 ---
 
@@ -62,6 +72,28 @@ A little box appears in your vision showing the answer. Simple!
 | "Set a timer for 10 minutes" | Countdown appears in your vision |
 | "How much money do I have?" | Shows your balance |
 | "Take a photo" | Captures what you see |
+| "Navigate to the coffee shop" | Shows AR arrows on the ground |
+| "Remind me about this later" | Creates spatial bookmark |
+| "What's on my schedule?" | Shows today's calendar |
+
+### 👐 Control with Gestures
+| Gesture | Action |
+|---------|--------|
+| **Pinch** | Select/confirm |
+| **Grab** | Move AR objects |
+| **Push** | Dismiss notifications |
+| **Swipe** | Scroll through content |
+| **Point** | Aim cursor |
+| **Thumbs Up** | Quick confirm |
+| **Wave** | Cancel/go back |
+
+### 👁️ Control with Your Eyes
+| Gaze Action | Result |
+|-------------|--------|
+| **Look at button for 500ms** | Click/select |
+| **Look left/right quickly** | Navigate between tabs |
+| **Look up** | Open quick menu |
+| **Look at notification** | Expand details |
 
 ### 📸 See Through It
 The glasses have a camera that can:
@@ -69,6 +101,7 @@ The glasses have a camera that can:
 - Recognize objects ("That's a coffee cup")
 - Identify people (if they're in your contacts)
 - Read text and translate it
+- Understand scenes ("You're in a restaurant")
 
 ### 💰 Pay With It
 No phone needed! Your glasses can:
@@ -83,6 +116,13 @@ You actually get a say in how Kāraṇa works:
 - Vote on changes
 - Your vote is proportional to your stake
 - True digital democracy!
+
+### 🪟 AR Tabs (Like Browser Tabs in 3D)
+Pin content anywhere in the real world:
+- Leave a browser tab floating by your desk
+- Video playing in the kitchen while you cook
+- Notes pinned to your office whiteboard
+- They stay there even when you leave and come back!
 
 ---
 
@@ -113,7 +153,7 @@ With Kāraṇa:
 
 ### 🧠 AI That Actually Helps
 
-Kāraṇa's AI is **context-aware**:
+Kāraṇa's AI is **context-aware** with a full Natural Language Understanding engine:
 
 ```
 Morning, at home: "Good morning! Your first meeting is at 9am."
@@ -121,12 +161,45 @@ Morning, at home: "Good morning! Your first meeting is at 9am."
 Walking to work: "Turn left ahead for coffee shop."
 
 At work: "You have 3 unread messages from the team."
+
+Looking at restaurant menu: "This dish contains peanuts - you're allergic."
 ```
 
 It learns your patterns WITHOUT sending data to the cloud:
 - Notices you check balance every Monday
 - Learns your common contacts
 - Suggests actions before you ask
+- Understands multi-turn conversations
+- Reasons about context to give better answers
+
+### 🔐 Security You Can Trust
+
+Kāraṇa includes enterprise-grade security:
+
+| Feature | What It Does |
+|---------|--------------|
+| **Iris Recognition** | Unlock with your eyes |
+| **Voice Print** | Recognize your voice pattern |
+| **Face Detection** | Know when you're wearing the glasses |
+| **AES-256 Encryption** | Military-grade data protection |
+| **Secure Enclave** | Hardware-protected secrets |
+| **Role-Based Access** | Control who can do what |
+
+### 🔄 Always Up-To-Date
+
+OTA (Over-The-Air) updates keep your glasses secure:
+- **Automatic downloads** when on WiFi
+- **Atomic installation** - never half-updated
+- **Automatic rollback** if update fails
+- **Version history** - can go back anytime
+
+### 🏥 Health & Wellness
+
+Kāraṇa cares about your wellbeing:
+- **Eye strain monitoring** - reminds you to take breaks
+- **Posture tracking** - gentle reminders to sit up straight
+- **Usage analytics** - see how you use your glasses
+- **Blue light adjustment** - easier on your eyes at night
 
 ### 📴 Works Offline
 
@@ -135,6 +208,7 @@ No WiFi? No problem!
 - Camera works offline  
 - Wallet works offline
 - Timer works offline
+- AR tabs stay where you left them
 
 Sync when you're ready, not when they say.
 
@@ -201,6 +275,33 @@ Glasses: [Quietly] "That's David Chen, met at conference last month"
 ```
 Only if David has shared his info with you, of course!
 
+### 🍽️ Restaurant
+```
+You: [Looking at menu]
+You: "What's good here?"
+Glasses: "Based on your preferences, try the pasta. 
+         Note: The salad has nuts - you're allergic."
+```
+
+### 📝 Work
+```
+You: [In meeting room]
+You: "Take notes on this meeting"
+Glasses: [AR notepad appears, transcribing speech]
+         [After meeting] "Summary: 3 action items assigned to you"
+```
+
+### 👐 AR Interaction
+```
+You: [See floating AR browser tab]
+     [Pinch gesture at the tab]
+Glasses: [Tab becomes selected]
+You: [Grab and move gesture]
+Glasses: [Tab moves to new position]
+You: [Push away gesture]
+Glasses: [Tab minimizes]
+```
+
 ---
 
 ## What Makes This Different From Meta/Apple/Google Glasses?
@@ -214,17 +315,61 @@ Only if David has shared his info with you, of course!
 | Can you vote on features? | No | Yes |
 | Works without internet? | Barely | Fully |
 | Open source? | No | Yes |
+| Hand gesture control? | Limited | Full 3D tracking |
+| Eye tracking? | Basic | Gaze + dwell selection |
+| Multi-user AR? | No | Collaborative sessions |
+| Security updates? | When they decide | Automatic with rollback |
+| Crash recovery? | Restart | Automatic recovery |
 
 ---
 
-## The Honest Limitations
+## System Capabilities
+
+### What Kāraṇa CAN Do:
+
+✅ **Voice & AI**
+- Understand natural language commands
+- Have multi-turn conversations
+- Extract information from speech
+- Generate helpful responses
+- Learn your preferences
+
+✅ **Augmented Reality**
+- Pin content in physical space
+- Track hands and fingers
+- Detect where you're looking
+- Share AR with friends
+- Persist across sessions
+
+✅ **Security & Privacy**
+- Biometric authentication (iris, voice, face)
+- Military-grade encryption
+- Secure storage for secrets
+- Role-based permissions
+- Everything local, nothing to cloud
+
+✅ **System Services**
+- Automatic updates with rollback
+- Crash recovery and diagnostics
+- Power management and optimization
+- Health monitoring and wellness
+
+---
+
+### The Honest Limitations
 
 Let's be real about what Kāraṇa **can't** do (yet):
 
-❌ Run Photoshop (too heavy for glasses)
-❌ Play AAA video games (no GPU power)
-❌ Replace your laptop for work (small display)
-❌ Make phone calls directly (needs phone connection)
+❌ **Hardware Constraints**
+- Run Photoshop (too heavy for glasses)
+- Play AAA video games (no GPU power)
+- Replace your laptop for work (small display)
+- Make phone calls directly (needs phone connection)
+
+❌ **Current Development State**
+- Real hardware support still in progress
+- Some AI models need optimization
+- Battery life depends on usage
 
 But when you ask for something impossible, Kāraṇa is honest:
 ```
@@ -257,10 +402,10 @@ Kāraṇa: "Smart glasses can't run desktop apps like VS Code.
 A: Buy new ones, enter your 24 words, everything is restored. Your data is encrypted and can only be unlocked with those words.
 
 **Q: What if someone steals my glasses?**
-A: Without your 24 words (or password if you set one), they can't access your wallet or data. It's like stealing a locked safe.
+A: Without your 24 words (or biometric unlock - iris, voice, face), they can't access your wallet or data. It's like stealing a locked safe with fingerprint scanner.
 
 **Q: Do I need internet?**
-A: For basic stuff (voice, camera, timer) - no. For sending money or syncing with others - yes, but only briefly.
+A: For basic stuff (voice, camera, timer, AR) - no. For sending money or syncing with others - yes, but only briefly.
 
 **Q: Is this real cryptocurrency like Bitcoin?**
 A: KARA tokens are digital currency that works similarly to crypto, but designed for everyday use, not speculation.
@@ -271,6 +416,18 @@ A: Kāraṇa is designed for glasses-specific tasks. For full apps, use your pho
 **Q: What if the company behind Kāraṇa disappears?**
 A: Because it's open source and your identity is yours, Kāraṇa keeps working. The community can continue development. No company can "turn it off."
 
+**Q: How does it know where to put AR content?**
+A: Kāraṇa uses SLAM (like self-driving cars use to map roads) to understand your space. It remembers where you put things, even after you leave and come back.
+
+**Q: Can multiple people see the same AR?**
+A: Yes! Collaborative AR sessions let you share an AR experience with friends. You can both see and interact with the same virtual content.
+
+**Q: What happens if the glasses crash?**
+A: Automatic crash recovery kicks in. The system creates a crash dump (for debugging), tries recovery strategies, and restores your session. Like a phone rebooting after a freeze, but smarter.
+
+**Q: How do updates work?**
+A: Updates download automatically when you're on WiFi. Installation is "atomic" - either it fully works or it fully rolls back. You're never left with a half-updated, broken system.
+
 ---
 
 ## The Bottom Line
@@ -278,6 +435,28 @@ A: Because it's open source and your identity is yours, Kāraṇa keeps working.
 **Kāraṇa OS is smart glasses for people who want to own their technology, not rent it from big tech.**
 
 Your glasses. Your data. Your rules.
+
+### The Numbers
+
+| Metric | Value |
+|--------|-------|
+| **Lines of Code** | 137,000+ |
+| **Automated Tests** | 1,517 |
+| **Modules** | 45+ |
+| **Gesture Types** | 15+ |
+| **Language** | Rust (safe, fast) |
+
+### Key Features Summary
+
+- 🗣️ **Voice AI** - Natural language understanding with context
+- 👐 **Hand Tracking** - Full 3D finger and gesture recognition
+- 👁️ **Gaze Control** - Eye tracking with dwell selection
+- 🪟 **AR Tabs** - Browser-like tabs pinned in physical space
+- 🔐 **Biometric Security** - Iris, voice, and face authentication
+- 🔄 **OTA Updates** - Automatic secure updates with rollback
+- 🔧 **Self-Healing** - Crash recovery and diagnostics
+- ⛓️ **Blockchain** - Decentralized identity and payments
+- 📴 **Offline First** - Works without internet
 
 ---
 
