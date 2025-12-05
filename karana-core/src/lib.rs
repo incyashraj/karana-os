@@ -116,3 +116,13 @@ pub mod simulator;
 
 // HTTP/WebSocket API server
 pub mod api;
+
+// System diagnostics and health monitoring
+pub mod diagnostics;
+
+// Crash recovery and error handling
+pub mod recovery;
+
+// OTA (Over-The-Air) update system
+pub mod ota;
+
