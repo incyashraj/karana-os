@@ -105,6 +105,9 @@ pub mod assistant;
 // AR Content Rendering
 pub mod ar;
 
+// Intelligence System
+pub mod intelligence;
+
 // Simulator for testing without hardware
 pub mod simulator;
 
