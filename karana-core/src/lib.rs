@@ -126,3 +126,7 @@ pub mod recovery;
 // OTA (Over-The-Air) update system
 pub mod ota;
 
+// Machine Learning / ONNX Runtime integration
+pub mod ml;
+
+
