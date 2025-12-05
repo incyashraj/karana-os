@@ -294,6 +294,375 @@ impl IntentResolver {
             ],
         });
         
+        // Gallery/Photos intents
+        self.add_intent(IntentDefinition {
+            name: "show_gallery".to_string(),
+            category: IntentCategory::Media,
+            required_slots: vec![],
+            optional_slots: vec!["filter".to_string(), "date".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show photos".to_string(),
+                "open gallery".to_string(),
+                "show pictures".to_string(),
+                "my photos".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "show_photo".to_string(),
+            category: IntentCategory::Media,
+            required_slots: vec![],
+            optional_slots: vec!["query".to_string(), "date".to_string(), "location".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show me".to_string(),
+                "show that photo".to_string(),
+                "show picture from".to_string(),
+                "last photo".to_string(),
+                "recent photos".to_string(),
+            ],
+        });
+        
+        // Download intents
+        self.add_intent(IntentDefinition {
+            name: "download".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec!["item".to_string()],
+            optional_slots: vec!["source".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "download".to_string(),
+                "get".to_string(),
+                "save".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "show_downloads".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec![],
+            optional_slots: vec![],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show downloads".to_string(),
+                "my downloads".to_string(),
+                "downloaded files".to_string(),
+            ],
+        });
+        
+        // Notifications intents
+        self.add_intent(IntentDefinition {
+            name: "show_notifications".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec![],
+            optional_slots: vec!["app".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show notifications".to_string(),
+                "any notifications".to_string(),
+                "what's new".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "clear_notifications".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec![],
+            optional_slots: vec!["app".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "clear notifications".to_string(),
+                "dismiss all".to_string(),
+            ],
+        });
+        
+        // Media control intents
+        self.add_intent(IntentDefinition {
+            name: "pause_media".to_string(),
+            category: IntentCategory::Media,
+            required_slots: vec![],
+            optional_slots: vec![],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "pause".to_string(),
+                "stop music".to_string(),
+                "pause playback".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "skip_track".to_string(),
+            category: IntentCategory::Media,
+            required_slots: vec![],
+            optional_slots: vec!["direction".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "next song".to_string(),
+                "skip".to_string(),
+                "previous".to_string(),
+                "go back".to_string(),
+            ],
+        });
+        
+        // Email intents
+        self.add_intent(IntentDefinition {
+            name: "send_email".to_string(),
+            category: IntentCategory::Communication,
+            required_slots: vec!["recipient".to_string()],
+            optional_slots: vec!["subject".to_string(), "body".to_string()],
+            confirmation_required: true,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "send email".to_string(),
+                "email to".to_string(),
+                "compose email".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "check_email".to_string(),
+            category: IntentCategory::Communication,
+            required_slots: vec![],
+            optional_slots: vec!["filter".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "check email".to_string(),
+                "any new emails".to_string(),
+                "show inbox".to_string(),
+            ],
+        });
+        
+        // Weather/Info intents
+        self.add_intent(IntentDefinition {
+            name: "weather".to_string(),
+            category: IntentCategory::Information,
+            required_slots: vec![],
+            optional_slots: vec!["location".to_string(), "time".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "weather".to_string(),
+                "is it going to rain".to_string(),
+                "temperature".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "time".to_string(),
+            category: IntentCategory::Information,
+            required_slots: vec![],
+            optional_slots: vec!["timezone".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "what time".to_string(),
+                "time".to_string(),
+                "what's the time".to_string(),
+            ],
+        });
+        
+        // Calendar intents
+        self.add_intent(IntentDefinition {
+            name: "show_calendar".to_string(),
+            category: IntentCategory::Productivity,
+            required_slots: vec![],
+            optional_slots: vec!["date".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show calendar".to_string(),
+                "my schedule".to_string(),
+                "what's on my calendar".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "create_event".to_string(),
+            category: IntentCategory::Productivity,
+            required_slots: vec!["title".to_string()],
+            optional_slots: vec!["time".to_string(), "duration".to_string(), "location".to_string()],
+            confirmation_required: true,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "create event".to_string(),
+                "schedule meeting".to_string(),
+                "add to calendar".to_string(),
+            ],
+        });
+        
+        // Contact intents
+        self.add_intent(IntentDefinition {
+            name: "show_contact".to_string(),
+            category: IntentCategory::Communication,
+            required_slots: vec!["contact".to_string()],
+            optional_slots: vec![],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show contact".to_string(),
+                "contact info for".to_string(),
+                "details for".to_string(),
+            ],
+        });
+        
+        // Map/Location intents
+        self.add_intent(IntentDefinition {
+            name: "show_map".to_string(),
+            category: IntentCategory::Navigation,
+            required_slots: vec![],
+            optional_slots: vec!["location".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "show map".to_string(),
+                "where am i".to_string(),
+                "current location".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "find_nearby".to_string(),
+            category: IntentCategory::Navigation,
+            required_slots: vec!["place_type".to_string()],
+            optional_slots: vec![],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "find nearby".to_string(),
+                "where is the nearest".to_string(),
+                "restaurants near me".to_string(),
+                "coffee shops".to_string(),
+            ],
+        });
+        
+        // System control intents
+        self.add_intent(IntentDefinition {
+            name: "toggle_dnd".to_string(),
+            category: IntentCategory::Settings,
+            required_slots: vec![],
+            optional_slots: vec!["state".to_string(), "duration".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "do not disturb".to_string(),
+                "silence notifications".to_string(),
+                "quiet mode".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "battery_status".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec![],
+            optional_slots: vec![],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "battery".to_string(),
+                "how much battery".to_string(),
+                "power level".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "toggle_wifi".to_string(),
+            category: IntentCategory::Settings,
+            required_slots: vec![],
+            optional_slots: vec!["state".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "wifi".to_string(),
+                "turn on wifi".to_string(),
+                "connect to wifi".to_string(),
+            ],
+        });
+        
+        self.add_intent(IntentDefinition {
+            name: "toggle_bluetooth".to_string(),
+            category: IntentCategory::Settings,
+            required_slots: vec![],
+            optional_slots: vec!["state".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "bluetooth".to_string(),
+                "turn on bluetooth".to_string(),
+                "pair device".to_string(),
+            ],
+        });
+        
+        // Share intent
+        self.add_intent(IntentDefinition {
+            name: "share".to_string(),
+            category: IntentCategory::Communication,
+            required_slots: vec![],
+            optional_slots: vec!["item".to_string(), "contact".to_string(), "app".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "share".to_string(),
+                "share this".to_string(),
+                "send to".to_string(),
+            ],
+        });
+        
+        // Read aloud intent
+        self.add_intent(IntentDefinition {
+            name: "read_aloud".to_string(),
+            category: IntentCategory::Information,
+            required_slots: vec![],
+            optional_slots: vec!["content".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "read this".to_string(),
+                "read aloud".to_string(),
+                "what does this say".to_string(),
+            ],
+        });
+        
+        // Help intent
+        self.add_intent(IntentDefinition {
+            name: "help".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec![],
+            optional_slots: vec!["topic".to_string()],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "help".to_string(),
+                "what can you do".to_string(),
+                "how do i".to_string(),
+            ],
+        });
+        
+        // Stop/Cancel intent
+        self.add_intent(IntentDefinition {
+            name: "cancel".to_string(),
+            category: IntentCategory::System,
+            required_slots: vec![],
+            optional_slots: vec![],
+            confirmation_required: false,
+            feasible_on_glasses: true,
+            example_phrases: vec![
+                "cancel".to_string(),
+                "stop".to_string(),
+                "nevermind".to_string(),
+                "forget it".to_string(),
+            ],
+        });
+        
         // Infeasible intents (for explanation)
         self.add_intent(IntentDefinition {
             name: "desktop_app".to_string(),

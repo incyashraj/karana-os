@@ -13,6 +13,7 @@ pub mod context_manager;
 pub mod error_recovery;
 pub mod slot_filler;
 pub mod query_understanding;
+pub mod action_executor;
 
 pub use nlu::*;
 pub use intent::*;
@@ -24,6 +25,7 @@ pub use context_manager::*;
 pub use error_recovery::*;
 pub use slot_filler::*;
 pub use query_understanding::*;
+pub use action_executor::*;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
