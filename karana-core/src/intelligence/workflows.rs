@@ -575,7 +575,7 @@ mod tests {
                 location: None,
                 current_app: None,
                 recent_apps: vec![],
-                time_of_day: TimeOfDay::Morning,
+                time_of_day: TimeOfDay::Afternoon, // Use Afternoon to avoid morning_routine matching
                 battery_level: 80,
                 is_moving: false,
                 ambient_noise: NoiseLevel::Normal,

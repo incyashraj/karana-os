@@ -129,4 +129,8 @@ pub mod ota;
 // Machine Learning / ONNX Runtime integration
 pub mod ml;
 
+// Audio processing pipeline
+pub mod audio_pipeline;
+
+
 
