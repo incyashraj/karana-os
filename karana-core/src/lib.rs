@@ -135,3 +135,6 @@ pub mod audio_pipeline;
 // Video processing pipeline
 pub mod video_pipeline;
 
+// Hardware Abstraction Layer (HAL)
+pub mod hal;
+
