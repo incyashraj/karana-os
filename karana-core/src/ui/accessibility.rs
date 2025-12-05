@@ -274,10 +274,11 @@ impl AccessibilityTree {
 
     /// Find next focusable node
     pub fn next_focusable(&self, current: Option<u64>) -> Option<u64> {
-        let focusable: Vec<u64> = self.nodes.values()
+        let mut focusable: Vec<u64> = self.nodes.values()
             .filter(|n| n.info.focusable)
             .map(|n| n.id)
             .collect();
+        focusable.sort(); // Ensure deterministic order
         
         if focusable.is_empty() {
             return None;
@@ -297,10 +298,11 @@ impl AccessibilityTree {
 
     /// Find previous focusable node
     pub fn previous_focusable(&self, current: Option<u64>) -> Option<u64> {
-        let focusable: Vec<u64> = self.nodes.values()
+        let mut focusable: Vec<u64> = self.nodes.values()
             .filter(|n| n.info.focusable)
             .map(|n| n.id)
             .collect();
+        focusable.sort(); // Ensure deterministic order
         
         if focusable.is_empty() {
             return None;

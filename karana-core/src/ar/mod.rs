@@ -6,12 +6,26 @@ pub mod anchors;
 pub mod overlays;
 pub mod renderer;
 pub mod shaders;
+pub mod tracking;
+pub mod plane;
+pub mod mesh;
+pub mod lighting;
+pub mod occlusion;
+pub mod session;
+pub mod content;
 
 pub use objects::*;
 pub use anchors::*;
 pub use overlays::*;
 pub use renderer::*;
 pub use shaders::*;
+pub use tracking::*;
+pub use plane::*;
+pub use mesh::*;
+pub use lighting::*;
+pub use occlusion::*;
+pub use session::*;
+pub use content::*;
 
 use nalgebra::{Matrix4, Point3, Quaternion, UnitQuaternion, Vector3, Vector4};
 use std::collections::HashMap;
