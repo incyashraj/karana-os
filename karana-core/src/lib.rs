@@ -132,5 +132,6 @@ pub mod ml;
 // Audio processing pipeline
 pub mod audio_pipeline;
 
-
+// Video processing pipeline
+pub mod video_pipeline;
 

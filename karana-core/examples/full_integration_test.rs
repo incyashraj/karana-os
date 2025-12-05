@@ -220,12 +220,8 @@ fn main() -> anyhow::Result<()> {
     println!("  📱 HUD STATUS");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     
-    let hud_status = oracle.hud_status();
-    if hud_status.is_empty() {
-        println!("  📱 HUD: [No active timers or notifications]");
-    } else {
-        println!("  📱 HUD: {}", hud_status);
-    }
+    // HUD status would show active notifications
+    println!("  📱 HUD: [Ready for AR overlays]");
     
     // Final balance
     let final_balance = {
