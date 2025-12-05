@@ -9,6 +9,10 @@ pub mod dialogue;
 pub mod response;
 pub mod entities;
 pub mod reasoning;
+pub mod context_manager;
+pub mod error_recovery;
+pub mod slot_filler;
+pub mod query_understanding;
 
 pub use nlu::*;
 pub use intent::*;
@@ -16,6 +20,10 @@ pub use dialogue::*;
 pub use response::*;
 pub use entities::*;
 pub use reasoning::*;
+pub use context_manager::*;
+pub use error_recovery::*;
+pub use slot_filler::*;
+pub use query_understanding::*;
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
