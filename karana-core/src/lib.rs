@@ -138,3 +138,6 @@ pub mod video_pipeline;
 // Hardware Abstraction Layer (HAL)
 pub mod hal;
 
+// Device Drivers
+pub mod drivers;
+
