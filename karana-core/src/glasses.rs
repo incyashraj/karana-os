@@ -7,7 +7,7 @@
 //! - Ambient context awareness
 //!
 //! ## Architecture
-//! ```
+//! ```text
 //! Microphone → Whisper → Intent Parsing → Oracle → Blockchain → AR HUD
 //!                           ↑                          ↓
 //!                    Gaze Tracking ←←←←←←←←←←← Response Formatting

@@ -7,7 +7,7 @@
 //! - Namespaced data blobs for our transactions
 //!
 //! ## Architecture
-//! ```
+//! ```text
 //! Karana Transaction → Serialize → Submit to Celestia Namespace → DA Proof
 //!                                                              ↓
 //! Smart Glasses ← Light Client Verification ← Data Availability Sampling

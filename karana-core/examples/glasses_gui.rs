@@ -5,9 +5,17 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(not(feature = "gui"))]
+fn main() {
+    eprintln!("This example requires the 'gui' feature. Run with: cargo run --example glasses_gui --features gui");
+}
+
+#[cfg(feature = "gui")]
 use eframe::egui;
+#[cfg(feature = "gui")]
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "gui")]
 fn main() -> eframe::Result<()> {
     env_logger::init();
     
@@ -30,6 +38,7 @@ fn main() -> eframe::Result<()> {
     )
 }
 
+#[cfg(feature = "gui")]
 fn setup_custom_style(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();
     
@@ -48,7 +57,9 @@ fn setup_custom_style(ctx: &egui::Context) {
     ctx.set_style(style);
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "gui")]
 enum Scene {
     Home,
     Kitchen,
@@ -57,6 +68,7 @@ enum Scene {
     Park,
 }
 
+#[cfg(feature = "gui")]
 impl Scene {
     fn name(&self) -> &str {
         match self {
@@ -119,7 +131,9 @@ impl Scene {
     }
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
+#[cfg(feature = "gui")]
 enum ObjectCategory {
     Furniture,
     Electronics,
@@ -134,6 +148,7 @@ enum ObjectCategory {
     Animal,
 }
 
+#[cfg(feature = "gui")]
 impl ObjectCategory {
     fn color(&self) -> egui::Color32 {
         match self {
@@ -152,7 +167,9 @@ impl ObjectCategory {
     }
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
+#[cfg(feature = "gui")]
 struct DetectedObject {
     name: String,
     confidence: f32,
@@ -160,6 +177,7 @@ struct DetectedObject {
     bounding_box: Option<(f32, f32, f32, f32)>, // x, y, w, h as percentages
 }
 
+#[cfg(feature = "gui")]
 impl DetectedObject {
     fn new(name: &str, confidence: f32, category: ObjectCategory) -> Self {
         // Generate random bounding box position
@@ -184,7 +202,9 @@ impl DetectedObject {
     }
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
+#[cfg(feature = "gui")]
 struct Notification {
     title: String,
     body: String,
@@ -193,13 +213,16 @@ struct Notification {
     priority: NotificationPriority,
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "gui")]
 enum NotificationPriority {
     Low,
     Normal,
     High,
 }
 
+#[cfg(feature = "gui")]
 impl Notification {
     fn new(title: &str, body: &str, icon: &str, priority: NotificationPriority) -> Self {
         Self {
@@ -212,13 +235,16 @@ impl Notification {
     }
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
+#[cfg(feature = "gui")]
 struct ChatMessage {
     is_user: bool,
     text: String,
     timestamp: Instant,
 }
 
+#[cfg(feature = "gui")]
 struct GlassesSimulator {
     // Device state
     battery: f32,
@@ -259,14 +285,18 @@ struct GlassesSimulator {
     selected_tab: Tab,
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone)]
+#[cfg(feature = "gui")]
 struct MemoryItem {
     what: String,
     location: String,
     when: String,
 }
 
+#[cfg(feature = "gui")]
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "gui")]
 enum Tab {
     Camera,
     Assistant,
@@ -274,6 +304,7 @@ enum Tab {
     Settings,
 }
 
+#[cfg(feature = "gui")]
 impl GlassesSimulator {
     fn new() -> Self {
         let mut sim = Self {
@@ -403,6 +434,7 @@ impl GlassesSimulator {
     }
 }
 
+#[cfg(feature = "gui")]
 impl eframe::App for GlassesSimulator {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Update time for animations
@@ -456,6 +488,7 @@ impl eframe::App for GlassesSimulator {
     }
 }
 
+#[cfg(feature = "gui")]
 impl GlassesSimulator {
     fn render_status_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {

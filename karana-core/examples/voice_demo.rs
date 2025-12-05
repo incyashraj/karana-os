@@ -22,7 +22,7 @@ use karana_core::{
     storage::KaranaStorage,
     economy::{Ledger, Governance},
     oracle::KaranaOracle,
-    voice::{VoiceConfig, VoiceToIntent},
+    voice_pipeline::{VoiceConfig, VoiceToIntent},
 };
 use std::sync::{Arc, Mutex};
 use std::io::{self, Write};

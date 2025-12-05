@@ -22,6 +22,7 @@ pub mod oracle;
 pub mod celestia;
 pub mod glasses;
 pub mod voice;
+pub mod voice_pipeline;
 pub mod camera;
 pub mod vision;
 pub mod timer;

@@ -9,7 +9,7 @@
 //! - Hybrid: Combined inputs (e.g., look + speak, point + pinch)
 //!
 //! ## Architecture
-//! ```
+//! ```text
 //! Voice ──┐
 //! Gesture ├──→ Command Fusion → Intent Resolver → AR Tab Actions
 //! Gaze ───┘

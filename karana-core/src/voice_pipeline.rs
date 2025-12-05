@@ -3,7 +3,7 @@
 //! Real voice-to-intent processing using Whisper STT.
 //!
 //! ## Architecture
-//! ```
+//! ```text
 //! Microphone → Resample → VAD → Whisper → Intent → Oracle
 //!      ↓                    ↓
 //!   16kHz PCM          Voice Activity Detection
