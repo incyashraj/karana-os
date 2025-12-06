@@ -32,6 +32,8 @@ pub mod manifest;
 pub mod use_cases;
 pub mod tab_commands;
 pub mod universal;  // Phase 41: Universal query handling
+pub mod embeddings; // Phase 42: Vector embeddings
+pub mod swarm_knowledge; // Phase 42: P2P knowledge sharing
 
 // Legacy exports
 pub use intent::*;

@@ -6,6 +6,9 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, bail};
 
+use super::embeddings::{EmbeddingGenerator, cosine_similarity};
+use super::swarm_knowledge::SwarmKnowledge;
+
 /// Universal query response with provenance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UniversalResponse {
@@ -41,6 +44,8 @@ pub struct UniversalOracle {
     pub swarm_query_enabled: bool,
     pub web_proxy_enabled: bool,
     pub embedding_dim: usize,
+    embedding_gen: Arc<EmbeddingGenerator>,
+    swarm_knowledge: Arc<SwarmKnowledge>,
 }
 
 impl UniversalOracle {
@@ -50,6 +55,8 @@ impl UniversalOracle {
             swarm_query_enabled: true,
             web_proxy_enabled: false,  // Disabled by default (privacy)
             embedding_dim: 384,  // MiniLM-L6-v2 dimension
+            embedding_gen: Arc::new(EmbeddingGenerator::default()),
+            swarm_knowledge: Arc::new(SwarmKnowledge::new("did:karana:anonymous".to_string())),
         })
     }
 
@@ -88,9 +95,7 @@ impl UniversalOracle {
 
     /// Embed query text to vector
     fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
-        // TODO: Use MiniLM-L6-v2 via ONNX or Candle
-        // For now, stub with random vector
-        Ok(vec![0.0; self.embedding_dim])
+        self.embedding_gen.embed(text)
     }
 
     /// Query local RAG knowledge base
@@ -119,9 +124,8 @@ impl UniversalOracle {
 
     /// Query swarm peers via libp2p gossip
     async fn query_swarm(&self, query: &str, _context: &QueryContext) -> Result<Option<UniversalResponse>> {
-        // TODO: Publish to /karana/knowledge topic, collect responses
-        // For now, return None (not implemented)
-        Ok(None)
+        let embedding = self.embed_query(query)?;
+        self.swarm_knowledge.query_swarm(query, embedding).await
     }
 
     /// Compute answer for math/logic queries
@@ -223,44 +227,48 @@ impl LocalKnowledgeBase {
 
     /// Load default knowledge chunks
     fn load_default_knowledge() -> Result<Vec<RagChunk>> {
-        Ok(vec![
-            RagChunk {
-                text: "Kāraṇa OS is a self-sovereign operating system for smart glasses with blockchain integration.".to_string(),
-                embedding: vec![0.0; 384],
+        let generator = EmbeddingGenerator::default();
+        
+        let texts = vec![
+            ("Kāraṇa OS is a self-sovereign operating system for smart glasses with blockchain integration.", "system"),
+            ("The capital of France is Paris, located on the Seine River in northern France.", "geography"),
+            ("Quantum entanglement is a phenomenon where particles become correlated such that the state of one particle instantly affects the state of another, regardless of distance.", "physics"),
+            ("The Pythagorean theorem states that in a right triangle, a² + b² = c², where c is the hypotenuse.", "mathematics"),
+        ];
+        
+        let mut chunks = Vec::new();
+        for (text, source) in texts {
+            let embedding = generator.embed(text)?;
+            chunks.push(RagChunk {
+                text: text.to_string(),
+                embedding,
                 score: 0.0,
-                source_doc: "system".to_string(),
+                source_doc: source.to_string(),
                 timestamp: 0,
-            },
-            RagChunk {
-                text: "The capital of France is Paris, located on the Seine River in northern France.".to_string(),
-                embedding: vec![0.0; 384],
-                score: 0.0,
-                source_doc: "geography".to_string(),
-                timestamp: 0,
-            },
-            RagChunk {
-                text: "Quantum entanglement is a phenomenon where particles become correlated such that the state of one particle instantly affects the state of another, regardless of distance.".to_string(),
-                embedding: vec![0.0; 384],
-                score: 0.0,
-                source_doc: "physics".to_string(),
-                timestamp: 0,
-            },
-            RagChunk {
-                text: "The Pythagorean theorem states that in a right triangle, a² + b² = c², where c is the hypotenuse.".to_string(),
-                embedding: vec![0.0; 384],
-                score: 0.0,
-                source_doc: "mathematics".to_string(),
-                timestamp: 0,
-            },
-        ])
+            });
+        }
+        
+        Ok(chunks)
     }
 
-    /// Search for similar chunks
+    /// Search for similar chunks using cosine similarity
     pub fn search(&self, embedding: &[f32], k: usize) -> Result<Vec<RagChunk>> {
-        // TODO: Implement proper cosine similarity search
-        // For now, return top-k by simple text matching
-        let mut results = self.chunks.clone();
+        // Compute cosine similarity for each chunk
+        let mut results: Vec<RagChunk> = self.chunks.iter().map(|chunk| {
+            let similarity = cosine_similarity(embedding, &chunk.embedding);
+            RagChunk {
+                text: chunk.text.clone(),
+                embedding: chunk.embedding.clone(),
+                score: similarity,
+                source_doc: chunk.source_doc.clone(),
+                timestamp: chunk.timestamp,
+            }
+        }).collect();
+        
+        // Sort by similarity (descending)
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        
+        // Return top-k
         results.truncate(k);
         Ok(results)
     }
