@@ -31,6 +31,7 @@ pub mod sense;
 pub mod manifest;
 pub mod use_cases;
 pub mod tab_commands;
+pub mod universal;  // Phase 41: Universal query handling
 
 // Legacy exports
 pub use intent::*;
@@ -48,6 +49,7 @@ pub use veil::OracleVeil;
 pub use sense::MultimodalSense;
 pub use manifest::MinimalManifest;
 pub use use_cases::UseCaseDispatcher;
+pub use universal::{UniversalOracle, UniversalResponse, ResponseSource, QueryContext};  // Phase 41
 
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};

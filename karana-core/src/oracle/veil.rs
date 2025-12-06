@@ -55,6 +55,9 @@ pub struct OracleVeil {
     /// Tab command parser for AR tab voice commands
     tab_parser: TabCommandParser,
     
+    /// Universal Oracle for random queries (Phase 41)
+    universal_oracle: Arc<crate::oracle::universal::UniversalOracle>,
+    
     /// Channel to send commands to Monad
     cmd_tx: mpsc::Sender<OracleCommand>,
     
@@ -603,6 +606,9 @@ pub enum IntentAction {
     Help,
     Clarify { question: String },
     
+    // ═══ Universal Query (Phase 41) ═══
+    UniversalQuery { answer: String, source: String, confidence: f32 },
+    
     // ═══ Infeasible ═══
     Infeasible { reason: String, alternative: String },
     
@@ -621,10 +627,14 @@ impl OracleVeil {
         cmd_tx: mpsc::Sender<OracleCommand>,
         result_rx: mpsc::Receiver<CommandResult>,
     ) -> Result<Self> {
+        let universal_oracle = crate::oracle::universal::UniversalOracle::new()
+            .map_err(|e| anyhow!("Failed to create universal oracle: {}", e))?;
+        
         Ok(Self {
             ai,
             legacy_oracle: Arc::new(StdMutex::new(Oracle::new())),
             tab_parser: TabCommandParser::new(),
+            universal_oracle: Arc::new(universal_oracle),
             cmd_tx,
             result_rx: Arc::new(Mutex::new(result_rx)),
             context: Arc::new(RwLock::new(OracleVeilContext::default())),
@@ -834,7 +844,43 @@ impl OracleVeil {
             });
         }
         
-        // 2. Try AI-based parsing (using local Phi-3 via Candle)
+        // 2. Check if this is a general knowledge query (not OS command)
+        if self.is_general_query(intent) {
+            log::info!("[ORACLE] Detected general query, routing to Universal Oracle");
+            
+            // Build query context
+            let ctx = self.context.read().await;
+            let query_ctx = crate::oracle::universal::QueryContext {
+                location: None, // TODO: Get from GPS
+                time_of_day: if timestamp % 86400 < 43200 { "morning".to_string() } else { "evening".to_string() },
+                recent_topics: ctx.conversation.iter()
+                    .rev()
+                    .take(3)
+                    .map(|t| t.content.clone())
+                    .collect(),
+                user_preferences: ctx.metadata.clone(),
+            };
+            
+            // Query universal oracle
+            let universal_response = self.universal_oracle.query(intent, &query_ctx).await?;
+            
+            // Convert to IntentAction
+            let action = IntentAction::UniversalQuery {
+                answer: universal_response.answer.clone(),
+                source: format!("{:?}", universal_response.source),
+                confidence: universal_response.confidence,
+            };
+            
+            return Ok(ParsedIntent {
+                action,
+                confidence: universal_response.confidence,
+                source,
+                timestamp,
+                raw: intent.to_string(),
+            });
+        }
+        
+        // 3. Try AI-based parsing (using local Phi-3 via Candle)
         let ai_result = {
             let mut ai = self.ai.lock().unwrap();
             ai.predict(intent, 100)
@@ -847,7 +893,7 @@ impl OracleVeil {
             }
         }
         
-        // 3. Fallback to legacy Oracle parser
+        // 4. Fallback to legacy Oracle parser
         let legacy_response = {
             let mut oracle = self.legacy_oracle.lock().unwrap();
             let ctx = LegacyContext::default();
@@ -855,6 +901,45 @@ impl OracleVeil {
         };
         
         self.parse_legacy_response(&legacy_response, intent, source, timestamp)
+    }
+    
+    /// Check if this is a general knowledge query vs an OS command
+    fn is_general_query(&self, intent: &str) -> bool {
+        let lower = intent.to_lowercase();
+        
+        // Knowledge query patterns
+        let knowledge_patterns = [
+            "what is", "what's", "who is", "who's", "where is", "where's",
+            "when is", "when's", "why is", "why's", "how does", "how do",
+            "tell me about", "explain", "describe", "define",
+            "capital of", "meaning of", "history of",
+            "square root", "calculate", "what's the answer",
+        ];
+        
+        // OS command patterns (if any match, it's NOT a general query)
+        let os_command_patterns = [
+            "send", "transfer", "stake", "vote", "open", "close", "pin",
+            "show", "list", "play", "call", "take photo", "record video",
+            "brightness", "volume", "my balance", "my tokens",
+            "navigate to", "remind me", "set timer",
+        ];
+        
+        // Check OS commands first (higher priority)
+        for pattern in &os_command_patterns {
+            if lower.contains(pattern) {
+                return false; // It's an OS command
+            }
+        }
+        
+        // Then check knowledge patterns
+        for pattern in &knowledge_patterns {
+            if lower.contains(pattern) {
+                return true; // It's a general query
+            }
+        }
+        
+        // Default: treat as OS command (safer)
+        false
     }
     
     /// Convert OracleCommand (from tab parser) to IntentAction
@@ -1295,6 +1380,12 @@ impl OracleVeil {
                 Ok(OracleCommand::GetPipelineStatus)  // Dummy command
             }
             
+            // ═══ Universal Query (Phase 41) ═══
+            IntentAction::UniversalQuery { .. } => {
+                // Doesn't need backend execution, handled in response formatting
+                Ok(OracleCommand::GetPipelineStatus)  // Dummy command
+            }
+            
             // ═══ Other ═══
             _ => {
                 Ok(OracleCommand::GetPipelineStatus)  // Default to status
@@ -1385,6 +1476,16 @@ impl OracleVeil {
                     haptic: HapticPattern::Attention,
                     needs_confirmation: true,
                     confidence: parsed.confidence,
+                    ..Default::default()
+                };
+            }
+            IntentAction::UniversalQuery { answer, source, confidence } => {
+                // Phase 41: Return universal query answer directly
+                return OracleResponse {
+                    whisper: answer.clone(),
+                    haptic: HapticPattern::Success,
+                    confidence: *confidence,
+                    data: Some(CommandData::Text(format!("source: {}", source))),
                     ..Default::default()
                 };
             }
