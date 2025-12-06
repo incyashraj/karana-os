@@ -4,6 +4,7 @@
 pub mod monitor;
 pub mod adaptive_ledger;
 pub mod ai_profiles;
+pub mod thermal; // Phase 55
 
 pub use monitor::{
     ResourceMonitor, ResourceSnapshot, ResourceLevel, 
@@ -18,6 +19,11 @@ pub use adaptive_ledger::{
 pub use ai_profiles::{
     AIProfileManager, AIProfile, AICapability,
     AIProfileConfig, AIProfileStatistics,
+};
+
+pub use thermal::{
+    ThermalGovernor, ThermalState, ThermalConfig, ThermalPrediction,
+    ThrottlingAction, ThermalStats,
 };
 
 use anyhow::Result;

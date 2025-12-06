@@ -12,6 +12,10 @@ use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
+// Phase 55: Model optimization and intelligent scheduling
+pub mod distillation;
+pub mod intent_scheduler;
+
 // TinyLlama 1.1B Chat (Quantized) - ~670MB
 const MODEL_REPO: &str = "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
 const MODEL_FILE: &str = "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";

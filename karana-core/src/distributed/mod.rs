@@ -7,6 +7,7 @@ pub mod compute_node;
 pub mod model_partitioning;
 pub mod distributed_inference;
 pub mod edge_cloud;
+pub mod workload_splitter; // Phase 55
 
 pub use compute_node::{
     ComputeNode, ComputeNodeProtocol, ComputeRequirements, HardwareAccel, NodeCapabilities,
@@ -25,6 +26,11 @@ pub use distributed_inference::{
 pub use edge_cloud::{
     EdgeCloudPool, NodeSelectionStrategy, PoolCapacity, PoolPolicy, PoolPriority, PoolStatistics,
     ResourcePool, ScaleAction, WorkloadType,
+};
+
+pub use workload_splitter::{
+    WorkloadSplitter, WorkloadProfile, PlacementDecision, PlacementPolicies,
+    NodeStatus as SplitterNodeStatus, PlacementStats,
 };
 
 /// Distributed compute coordinator
