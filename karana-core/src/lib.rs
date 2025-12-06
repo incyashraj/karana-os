@@ -24,6 +24,7 @@ pub mod resource; // Phase 46: Adaptive resource management
 pub mod resilience; // Phase 48: Fault resilience and graceful degradation
 pub mod capability; // Phase 47: Capability-based layer interface
 pub mod event_bus; // Phase 47: Event bus architecture
+pub mod app_ecosystem; // Phase 51: App ecosystem with native app support
 pub mod glasses;
 pub mod voice;
 pub mod voice_pipeline;
