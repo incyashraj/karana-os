@@ -609,6 +609,20 @@ pub enum IntentAction {
     // ═══ Universal Query (Phase 41) ═══
     UniversalQuery { answer: String, source: String, confidence: f32 },
     
+    // ═══ Knowledge Management (Phase 43) ═══
+    /// Remember/save knowledge: "remember that Rust is fast"
+    RememberThis { text: String, category: Option<String>, tags: Vec<String> },
+    /// Forget/delete knowledge: "forget about X"
+    ForgetAbout { query: String },
+    /// Search personal knowledge: "what do I know about X?"
+    SearchMyKnowledge { query: String },
+    /// List knowledge categories: "show my knowledge categories"
+    ListKnowledgeCategories,
+    /// Pin knowledge: "pin my note about Rust"
+    PinKnowledge { query: String },
+    /// Show knowledge stats: "show my knowledge stats"
+    ShowKnowledgeStats,
+    
     // ═══ Infeasible ═══
     Infeasible { reason: String, alternative: String },
     

@@ -5423,6 +5423,7 @@ dependencies = [
  "sha2 0.10.9",
  "symphonia",
  "sysinfo",
+ "tempfile",
  "term_size",
  "tokenizers",
  "tokio",

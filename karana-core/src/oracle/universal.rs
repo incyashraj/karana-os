@@ -8,6 +8,7 @@ use anyhow::{Result, bail};
 
 use super::embeddings::{EmbeddingGenerator, cosine_similarity};
 use super::swarm_knowledge::SwarmKnowledge;
+use super::knowledge_manager::KnowledgeManager;
 
 /// Universal query response with provenance
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,9 +44,11 @@ pub struct UniversalOracle {
     pub local_knowledge: Arc<LocalKnowledgeBase>,
     pub swarm_query_enabled: bool,
     pub web_proxy_enabled: bool,
+    pub user_knowledge_enabled: bool,
     pub embedding_dim: usize,
     embedding_gen: Arc<EmbeddingGenerator>,
     swarm_knowledge: Arc<SwarmKnowledge>,
+    knowledge_manager: Option<Arc<KnowledgeManager>>,
 }
 
 impl UniversalOracle {
@@ -54,10 +57,22 @@ impl UniversalOracle {
             local_knowledge: Arc::new(LocalKnowledgeBase::new()?),
             swarm_query_enabled: true,
             web_proxy_enabled: false,  // Disabled by default (privacy)
+            user_knowledge_enabled: true,
             embedding_dim: 384,  // MiniLM-L6-v2 dimension
             embedding_gen: Arc::new(EmbeddingGenerator::default()),
             swarm_knowledge: Arc::new(SwarmKnowledge::new("did:karana:anonymous".to_string())),
+            knowledge_manager: None,  // Set via set_knowledge_manager()
         })
+    }
+    
+    /// Set the knowledge manager for user's personal knowledge
+    pub fn set_knowledge_manager(&mut self, manager: Arc<KnowledgeManager>) {
+        self.knowledge_manager = Some(manager);
+    }
+    
+    /// Get reference to knowledge manager
+    pub fn knowledge_manager(&self) -> Option<Arc<KnowledgeManager>> {
+        self.knowledge_manager.clone()
     }
 
     /// Main entry point - handle any query
@@ -70,7 +85,14 @@ impl UniversalOracle {
         // 2. Embed query
         let embedding = self.embed_query(query)?;
 
-        // 3. Try local RAG (offline, fast)
+        // 3. Try user's personal knowledge first (highest priority)
+        if self.user_knowledge_enabled {
+            if let Some(response) = self.query_user_knowledge(&embedding, query).await? {
+                return Ok(response);
+            }
+        }
+
+        // 4. Try local RAG (offline, fast)
         if let Some(response) = self.query_local(&embedding, query).await? {
             return Ok(response);
         }
@@ -96,6 +118,40 @@ impl UniversalOracle {
     /// Embed query text to vector
     fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
         self.embedding_gen.embed(text)
+    }
+
+    /// Query user's personal knowledge base
+    async fn query_user_knowledge(&self, embedding: &[f32], query: &str) -> Result<Option<UniversalResponse>> {
+        let manager = match &self.knowledge_manager {
+            Some(m) => m,
+            None => return Ok(None),
+        };
+
+        // Search user's knowledge with higher limit (they want their own knowledge prioritized)
+        let results = manager.search(query, 3).await?;
+        
+        if results.is_empty() {
+            return Ok(None);
+        }
+
+        // User knowledge gets priority - use first result if confidence is decent
+        let best = &results[0];
+        let similarity = cosine_similarity(embedding, &best.embedding);
+        
+        if similarity < 0.4 {
+            return Ok(None);
+        }
+
+        Ok(Some(UniversalResponse {
+            answer: best.text.clone(),
+            source: ResponseSource::LocalKnowledge,
+            confidence: similarity,
+            proof: None,
+            follow_up: vec![
+                "Tell me more from my notes".to_string(),
+                format!("Other notes in {}", best.category),
+            ],
+        }))
     }
 
     /// Query local RAG knowledge base
