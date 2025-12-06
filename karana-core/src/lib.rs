@@ -147,3 +147,6 @@ pub mod hal;
 // Device Drivers
 pub mod drivers;
 
+// Phase 52: Distributed Compute - edge cloud integration
+pub mod distributed;
+
