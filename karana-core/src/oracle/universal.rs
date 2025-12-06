@@ -9,6 +9,7 @@ use anyhow::{Result, bail};
 use super::embeddings::{EmbeddingGenerator, cosine_similarity};
 use super::swarm_knowledge::SwarmKnowledge;
 use super::knowledge_manager::KnowledgeManager;
+use super::knowledge_graph::{KnowledgeGraphBuilder, KnowledgeGraph};
 
 /// Universal query response with provenance
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +19,17 @@ pub struct UniversalResponse {
     pub confidence: f32,
     pub proof: Option<Vec<u8>>,  // ZK attestation
     pub follow_up: Vec<String>,
+}
+
+/// Knowledge graph insights
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphInsights {
+    pub total_nodes: usize,
+    pub total_edges: usize,
+    pub central_nodes: Vec<(String, usize)>,
+    pub num_clusters: usize,
+    pub density: f32,
+    pub last_updated: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -49,6 +61,7 @@ pub struct UniversalOracle {
     embedding_gen: Arc<EmbeddingGenerator>,
     swarm_knowledge: Arc<SwarmKnowledge>,
     knowledge_manager: Option<Arc<KnowledgeManager>>,
+    graph_builder: Arc<KnowledgeGraphBuilder>,
 }
 
 impl UniversalOracle {
@@ -62,6 +75,7 @@ impl UniversalOracle {
             embedding_gen: Arc::new(EmbeddingGenerator::default()),
             swarm_knowledge: Arc::new(SwarmKnowledge::new("did:karana:anonymous".to_string())),
             knowledge_manager: None,  // Set via set_knowledge_manager()
+            graph_builder: Arc::new(KnowledgeGraphBuilder::new()),
         })
     }
     
@@ -218,6 +232,42 @@ impl UniversalOracle {
                 "Add to knowledge".to_string(),
             ],
         })
+    }
+
+    /// Build knowledge graph visualization
+    pub async fn build_knowledge_graph(&self) -> Result<Option<KnowledgeGraph>> {
+        if let Some(ref km) = self.knowledge_manager {
+            let chunks = km.get_all_chunks().await;
+            
+            if chunks.is_empty() {
+                return Ok(None);
+            }
+
+            let graph = self.graph_builder.build_from_chunks(&chunks)?;
+            Ok(Some(graph))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get graph analysis metrics
+    pub async fn get_graph_insights(&self) -> Result<Option<GraphInsights>> {
+        if let Some(graph) = self.build_knowledge_graph().await? {
+            let central_nodes = super::knowledge_graph::GraphAnalyzer::find_central_nodes(&graph, 5);
+            let clusters = super::knowledge_graph::GraphAnalyzer::find_clusters(&graph);
+            let density = super::knowledge_graph::GraphAnalyzer::calculate_density(&graph);
+
+            Ok(Some(GraphInsights {
+                total_nodes: graph.nodes.len(),
+                total_edges: graph.edges.len(),
+                central_nodes,
+                num_clusters: clusters.len(),
+                density,
+                last_updated: graph.metadata.last_updated,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Synthesize answer from RAG results
