@@ -11,6 +11,7 @@ pub mod ai;
 pub mod economy;
 pub mod gov;
 pub mod chain;
+pub mod ledger; // Phase 53: Ledger optimization and pluggable backends
 pub mod market;
 pub mod installer;
 pub mod pkg;
