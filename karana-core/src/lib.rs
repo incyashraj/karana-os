@@ -21,6 +21,7 @@ pub mod ipc;
 pub mod oracle;
 pub mod celestia;
 pub mod resource; // Phase 46: Adaptive resource management
+pub mod resilience; // Phase 48: Fault resilience and graceful degradation
 pub mod glasses;
 pub mod voice;
 pub mod voice_pipeline;
