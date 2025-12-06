@@ -12,6 +12,11 @@ pub mod face_blur;
 pub mod data_retention;
 pub mod audit;
 
+// Phase 50: Enhanced privacy management
+pub mod retention;
+pub mod dashboard;
+pub mod ephemeral;
+
 pub use permissions::{Permission, PermissionManager, PermissionState, PermissionScope};
 pub use encryption::{EncryptionManager, EncryptionLevel, KeyInfo};
 pub use face_blur::{FaceBlurEngine, BlurMode, FaceDetection, PrivacyZone};
