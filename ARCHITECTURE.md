@@ -2,7 +2,7 @@
 
 > The operating system is not a tool. It is a partner.
 
-**Status: 2,058 tests | 180,000+ LOC Rust | Phases 1-40 Complete**
+**Status: 2,225+ tests | 180,000+ LOC Rust | Phases 1-52 Complete**
 
 ---
 
@@ -27,6 +27,18 @@
 │ Layer 2: P2P Network (libp2p, mDNS, Gossip, Sync)                       │
 ├─────────────────────────────────────────────────────────────────────────┤
 │ Layer 1: Hardware (Camera, Sensors, Audio, Display, Power)              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+         Cross-Cutting Systems (Phases 46-52)
+┌─────────────────────────────────────────────────────────────────────────┐
+│ • Resource Management (Adaptive Ledger, AI Profiles, Monitor)           │
+│ • Capability Architecture (Layer Discovery, Requirements, Registry)     │
+│ • Event Bus (Async Pub/Sub, Priority Routing, Filtering)                │
+│ • Resilience (Minimal Mode, Health Monitoring, Feature Gates, Chaos)    │
+│ • Progressive UX (Simple Intents, Smart Defaults, Tutorials, Personas)  │
+│ • Privacy Management (Retention, Ephemeral, Permissions, Zones)         │
+│ • App Ecosystem (Intent Protocol, Android Container, Native Apps)       │
+│ • Distributed Compute (Node Discovery, Model Partitioning, Pooling)     │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,6 +97,16 @@ pub struct Karana {
     pub recovery: Arc<RecoveryManager>,
     pub security: Arc<SecurityManager>,
     pub ota: Arc<OTAManager>,
+    
+    // Cross-Cutting Systems (Phases 46-52)
+    pub resource_coordinator: Arc<ResourceCoordinator>,
+    pub event_bus: Arc<EventBus>,
+    pub capability_registry: Arc<CapabilityRegistry>,
+    pub resilience_coordinator: Arc<ResilienceCoordinator>,
+    pub ux_coordinator: Arc<UXCoordinator>,
+    pub privacy_manager: Arc<PrivacyManager>,
+    pub app_ecosystem: Arc<AppEcosystem>,
+    pub distributed_coordinator: Arc<DistributedCoordinator>,
     
     pub fn tick(&mut self, delta_ms: u64) -> Result<()>,
     pub fn process_intent(&mut self, intent: &Intent) -> Result<CommandResult>,
@@ -1136,9 +1158,1907 @@ pub struct RingBuffer<T: Clone> {
 
 ---
 
+## Phase 46: Adaptive Resource Management
+
+**Purpose**: Intelligent resource optimization for constrained AR hardware
+
+### Resource Monitor (`resource/monitor.rs`)
+
+```rust
+pub struct ResourceMonitor {
+    cpu_usage: f32,           // 0.0-1.0
+    memory_used: u64,         // bytes
+    thermal_state: ThermalState,
+    battery_level: f32,       // 0.0-1.0
+    history: VecDeque<ResourceSnapshot>,  // 300 samples
+}
+
+pub enum ResourceLevel {
+    Abundant,    // >60% battery, <60°C, <50% CPU
+    Normal,      // 30-60% battery, 60-70°C
+    Limited,     // 15-30% battery, 70-80°C
+    Critical,    // <15% battery, >80°C
+}
+
+pub struct ResourcePrediction {
+    time_horizon: Duration,      // 5 minutes lookahead
+    expected_battery: f32,
+    expected_thermal: f32,
+    recommended_actions: Vec<ResourceAction>,
+}
+```
+
+**How It Works**:
+1. **Continuous Monitoring**: Samples CPU/memory/thermal/battery every 100ms
+2. **Historical Analysis**: Maintains 300-sample window (30 seconds at 100ms)
+3. **Predictive Analytics**: 5-minute lookahead prevents throttling
+4. **Capability Negotiation**: Layers request resources, monitor approves/denies
+
+**Example Flow**:
+```
+Battery: 18% → ResourceLevel::Limited
+Prediction: Will hit 15% in 3 minutes
+Actions: 
+  - Switch ledger to Light mode
+  - Reduce AI to Basic profile
+  - Pause background sync
+```
+
+### Adaptive Ledger (`resource/adaptive_ledger.rs`)
+
+```rust
+pub enum LedgerMode {
+    Full,      // All blocks + full validation
+    Light,     // Block headers + summaries
+    Minimal,   // Current state only
+}
+
+pub enum IntentType {
+    HighValue,   // Payments, critical operations
+    LowValue,    // Logging, analytics
+}
+
+impl AdaptiveLedger {
+    pub fn classify_intent(&self, intent: &Intent) -> IntentType;
+    pub fn should_process(&self, intent: &Intent) -> bool;
+    pub fn switch_mode(&mut self, mode: LedgerMode);
+}
+```
+
+**Mode Transitions**:
+- **Full → Light**: Battery <30% or temp >70°C
+- **Light → Minimal**: Battery <15% or temp >80°C
+- **Auto-pruning**: Removes old blocks in Light mode
+- **Checkpointing**: Periodic state snapshots
+
+### AI Profiles (`resource/ai_profiles.rs`)
+
+```rust
+pub enum AIProfile {
+    UltraLow,   // Text-only, <50MB RAM
+    Basic,      // Text + simple vision, <200MB
+    Standard,   // Full multimodal, <500MB
+    Advanced,   // All features + background tasks, <1GB
+}
+
+pub enum AICapability {
+    TextGeneration,
+    ImageRecognition,
+    SpeechToText,
+    Embedding,
+    SceneUnderstanding,
+}
+
+impl AIProfileManager {
+    pub fn current_capabilities(&self) -> Vec<AICapability>;
+    pub fn can_run_model(&self, model: &str) -> bool;
+    pub fn downgrade_if_needed(&mut self, resources: &ResourceSnapshot);
+}
+```
+
+**Profile Decision Matrix**:
+```
+Battery > 40%, Temp < 65°C → Advanced
+Battery 20-40%, Temp 65-75°C → Standard
+Battery 10-20%, Temp 75-85°C → Basic
+Battery < 10% or Temp > 85°C → UltraLow
+```
+
+### Resource Coordinator (`resource/mod.rs`)
+
+```rust
+pub struct ResourceCoordinator {
+    monitor: ResourceMonitor,
+    adaptive_ledger: AdaptiveLedger,
+    ai_profiles: AIProfileManager,
+}
+
+impl ResourceCoordinator {
+    pub async fn start(&mut self) {
+        loop {
+            let snapshot = self.monitor.take_snapshot();
+            let prediction = self.monitor.predict_resources();
+            
+            // Auto-adjust ledger
+            let ledger_mode = self.determine_ledger_mode(&snapshot);
+            self.adaptive_ledger.switch_mode(ledger_mode);
+            
+            // Auto-adjust AI
+            let ai_profile = self.determine_ai_profile(&snapshot);
+            self.ai_profiles.switch_profile(ai_profile);
+            
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+}
+```
+
+**Tests**: 22 tests covering monitoring, mode switching, predictions, coordination
+
+---
+
+## Phase 47: Capability-Based Architecture + Event Bus
+
+**Purpose**: Decouple layers for extensibility and maintainability
+
+### Layer Capabilities (`capability/traits.rs`)
+
+```rust
+pub enum LayerId {
+    Hardware,      // Layer 1
+    Network,       // Layer 2
+    Blockchain,    // Layer 3
+    Oracle,        // Layer 4
+    Intelligence,  // Layer 5
+    AI,            // Layer 6
+    Interface,     // Layer 7
+    Applications,  // Layer 8
+    System,        // Layer 9
+}
+
+pub enum Capability {
+    // Hardware capabilities
+    CameraCapture, MicrophoneInput, DisplayOutput,
+    IMUSensing, GPSPositioning, BatteryMonitoring,
+    
+    // Network capabilities
+    PeerDiscovery, MessageBroadcast, BlockSync,
+    
+    // Blockchain capabilities
+    TransactionProcessing, BlockValidation, StateQuery,
+    
+    // Intelligence capabilities
+    SceneUnderstanding, ObjectRecognition, VoiceRecognition,
+    
+    // AI capabilities
+    IntentClassification, EntityExtraction, ResponseGeneration,
+    
+    // Interface capabilities
+    VoiceInput, GazeTracking, GestureRecognition,
+    ARRendering, HapticFeedback,
+    
+    // Application capabilities
+    TimerManagement, NotificationDisplay, NavigationRouting,
+    
+    // System capabilities
+    Diagnostics, Recovery, OTAUpdate, Security,
+}
+
+pub struct CapabilityRequirements {
+    required: Vec<Capability>,
+    optional: Vec<Capability>,
+    version: semver::Version,
+}
+
+pub trait Layer {
+    fn id(&self) -> LayerId;
+    fn capabilities(&self) -> Vec<Capability>;
+    fn requirements(&self) -> CapabilityRequirements;
+    fn state(&self) -> LayerState;
+    async fn start(&mut self) -> Result<()>;
+    async fn stop(&mut self) -> Result<()>;
+}
+```
+
+**How It Works**:
+1. **Layer Registration**: Each layer advertises its capabilities
+2. **Requirement Checking**: Layers declare required/optional capabilities
+3. **Dynamic Discovery**: Registry enables runtime capability lookup
+4. **Graceful Degradation**: Missing optional capabilities don't block startup
+
+**Example**:
+```rust
+// AI Layer declares requirements
+CapabilityRequirements {
+    required: vec![
+        Capability::CameraCapture,        // Must have camera
+        Capability::MicrophoneInput,      // Must have mic
+    ],
+    optional: vec![
+        Capability::GPSPositioning,       // Nice to have GPS
+        Capability::IMUSensing,           // Nice to have IMU
+    ],
+}
+
+// At startup, system checks if requirements are met
+if !registry.has_capabilities(&ai_layer.requirements().required) {
+    return Err("AI layer cannot start - missing camera or mic");
+}
+```
+
+### Event Bus (`event_bus/core.rs`)
+
+```rust
+pub struct Event {
+    id: Uuid,
+    timestamp: SystemTime,
+    source: LayerId,
+    category: EventCategory,
+    priority: EventPriority,
+    payload: EventPayload,
+    metadata: EventMetadata,
+}
+
+pub enum EventPriority {
+    Critical,   // Process immediately
+    High,       // Process within 100ms
+    Normal,     // Process within 1s
+    Low,        // Process when idle
+}
+
+pub enum EventCategory {
+    System,     // System-level events
+    Hardware,   // Hardware state changes
+    Network,    // Network events
+    Blockchain, // Blockchain events
+    AI,         // AI processing events
+    User,       // User interaction events
+    Application,// App-level events
+    Error,      // Error events
+}
+
+pub struct EventBus {
+    subscribers: HashMap<EventCategory, Vec<Subscriber>>,
+    history: VecDeque<Event>,  // Recent events
+}
+
+impl EventBus {
+    pub async fn publish(&self, event: Event) -> Result<()>;
+    pub async fn subscribe(&mut self, 
+        category: EventCategory, 
+        handler: Box<dyn EventHandler>
+    ) -> SubscriptionId;
+    pub async fn unsubscribe(&mut self, id: SubscriptionId);
+}
+```
+
+**Event Flow**:
+```
+Layer 1 (Hardware) → Event { category: Hardware, payload: CameraFrameReady }
+                  ↓
+              Event Bus
+                  ↓
+    ┌─────────────┼─────────────┐
+    ↓             ↓             ↓
+Layer 5       Layer 6       Layer 7
+(Scene)       (AI)          (AR)
+```
+
+### Event Router (`event_bus/router.rs`)
+
+```rust
+pub enum RoutingPolicy {
+    All,              // Deliver to all subscribers
+    First,            // Deliver to first available
+    Random,           // Random selection
+    RoundRobin,       // Rotate through subscribers
+    CapabilityBased,  // Route based on capabilities
+}
+
+pub struct RoutingRule {
+    category: EventCategory,
+    priority: EventPriority,
+    policy: RoutingPolicy,
+    filters: Vec<EventFilter>,
+}
+
+impl EventRouter {
+    pub fn add_rule(&mut self, rule: RoutingRule);
+    pub fn route(&self, event: &Event) -> Vec<SubscriptionId>;
+}
+```
+
+**Example Routing**:
+```rust
+// Critical events → All subscribers
+RoutingRule {
+    category: EventCategory::Error,
+    priority: EventPriority::Critical,
+    policy: RoutingPolicy::All,
+}
+
+// AI requests → Capability-based routing
+RoutingRule {
+    category: EventCategory::AI,
+    policy: RoutingPolicy::CapabilityBased,
+    // Routes to subscribers with AICapability
+}
+```
+
+**Tests**: 18 tests (7 capability + 11 event bus)
+
+---
+
+## Phase 48: Fault Resilience & Graceful Degradation
+
+**Purpose**: Ultra-reliable operation with intelligent failure recovery
+
+### Minimal Mode (`resilience/minimal_mode.rs`)
+
+```rust
+pub struct MinimalModeManager {
+    state: MinimalModeState,
+    reason: Option<MinimalModeReason>,
+    start_time: Option<SystemTime>,
+}
+
+pub enum MinimalModeState {
+    Inactive,
+    Activating,
+    Active,
+    Deactivating,
+}
+
+pub enum MinimalModeReason {
+    LowBattery,        // <10% battery
+    HighTemperature,   // >85°C
+    LowMemory,         // <50MB free
+    CriticalError,     // Unrecoverable error
+    NetworkFailure,    // Total network loss
+    UserRequested,     // Manual activation
+    TestMode,          // Chaos testing
+}
+
+pub struct MinimalFeatures {
+    hud: bool,         // ✓ Basic HUD only
+    voice: bool,       // ✓ Voice commands
+    wallet: bool,      // ✓ Emergency payments
+    gesture: bool,     // ✗ No gestures
+    gaze: bool,        // ✗ No gaze
+    ai: bool,          // ✗ No AI
+    blockchain: bool,  // ✗ No sync
+}
+```
+
+**Minimal Mode Constraints**:
+- **Memory**: <10MB total footprint
+- **CPU**: <5% average usage
+- **Features**: HUD + Voice + Wallet only
+- **Battery**: Can run for hours on 5% battery
+
+**Activation Logic**:
+```rust
+impl MinimalModeManager {
+    pub fn should_activate(&self, resources: &ResourceSnapshot) -> bool {
+        resources.battery_level < 0.10 ||
+        resources.temperature > 85.0 ||
+        resources.memory_available < 50_000_000
+    }
+    
+    pub async fn activate(&mut self, reason: MinimalModeReason) {
+        // 1. Stop all non-essential services
+        self.stop_ai_engine().await;
+        self.stop_blockchain_sync().await;
+        self.stop_applications().await;
+        
+        // 2. Keep only essentials
+        self.keep_hud().await;
+        self.keep_voice().await;
+        self.keep_wallet().await;
+        
+        // 3. Notify user
+        self.show_minimal_mode_notice().await;
+    }
+}
+```
+
+### Health Monitor (`resilience/health_monitor.rs`)
+
+```rust
+pub struct HealthMonitor {
+    layer_health: HashMap<LayerId, HealthStatus>,
+    circuit_breakers: HashMap<LayerId, CircuitBreaker>,
+    history: HashMap<LayerId, VecDeque<HealthCheckResult>>,
+}
+
+pub enum HealthStatus {
+    Healthy,
+    Degraded,
+    Unhealthy,
+    Unknown,
+}
+
+pub struct CircuitBreaker {
+    state: CircuitState,
+    failure_count: u32,
+    last_failure: Option<SystemTime>,
+    config: CircuitBreakerConfig,
+}
+
+pub enum CircuitState {
+    Closed,     // Normal operation
+    Open,       // Blocking all requests
+    HalfOpen,   // Testing if recovered
+}
+
+pub struct CircuitBreakerConfig {
+    failure_threshold: u32,      // Open after N failures
+    timeout: Duration,            // Wait before HalfOpen
+    success_threshold: u32,       // Close after N successes
+}
+```
+
+**Circuit Breaker Logic**:
+```
+Closed (Normal)
+    ↓ (3 failures)
+Open (Blocked)
+    ↓ (wait 30s)
+HalfOpen (Testing)
+    ↓ (1 success)
+Closed (Recovered)
+```
+
+**Per-Layer Health Checks**:
+```rust
+impl HealthMonitor {
+    pub async fn check_hardware(&self) -> HealthCheckResult {
+        // Camera responsive? Sensors working?
+    }
+    
+    pub async fn check_network(&self) -> HealthCheckResult {
+        // Can discover peers? Can send messages?
+    }
+    
+    pub async fn check_ai(&self) -> HealthCheckResult {
+        // Models loaded? Inference working?
+    }
+    
+    // ... for all 9 layers
+}
+```
+
+### Feature Gates (`resilience/feature_gates.rs`)
+
+```rust
+pub enum Feature {
+    // Core features
+    VoiceCommands, GazeTracking, GestureRecognition,
+    ARRendering, HapticFeedback,
+    
+    // AI features
+    SceneUnderstanding, ObjectRecognition, IntentClassification,
+    DialogueManagement, ResponseGeneration,
+    
+    // Blockchain features
+    BlockProduction, TransactionValidation, PeerDiscovery,
+    
+    // Application features
+    ARTabs, SpatialAnchors, Navigation, Social,
+    TimerSystem, Notifications, Wellness,
+    
+    // System features
+    Diagnostics, Recovery, OTAUpdates, Biometrics,
+    
+    // Advanced features (Phases 46-52)
+    ResourceManagement, CapabilitySystem, EventBus,
+    MinimalMode, PrivacyManagement, AppEcosystem,
+    DistributedCompute,
+}
+
+pub struct FeatureGateManager {
+    gates: HashMap<Feature, FeatureState>,
+    dependencies: HashMap<Feature, Vec<Feature>>,
+}
+
+pub enum FeatureState {
+    Enabled,
+    Disabled,
+    Emergency,  // Kill switch activated
+}
+```
+
+**Feature Dependencies**:
+```rust
+Feature::ARTabs depends on:
+  - Feature::ARRendering
+  - Feature::SpatialAnchors
+  - Feature::GazeTracking
+
+If ARRendering is disabled → ARTabs auto-disables
+```
+
+**Emergency Kill Switches**:
+```rust
+impl FeatureGateManager {
+    pub fn emergency_disable(&mut self, feature: Feature) {
+        // Immediately disable feature + all dependents
+        self.gates.insert(feature, FeatureState::Emergency);
+        for dependent in self.find_dependents(feature) {
+            self.gates.insert(dependent, FeatureState::Disabled);
+        }
+    }
+}
+```
+
+### Chaos Testing (`resilience/chaos.rs`)
+
+```rust
+pub enum ChaosScenario {
+    CameraFailure,      // Camera stops responding
+    NetworkPartition,   // Lose all peers
+    ByzantineNode,      // Malicious peer
+    OTARollback,        // Update fails, rollback
+    LowBattery,         // Sudden battery drop
+    HighTemperature,    // Thermal throttling
+    MemoryPressure,     // Memory exhaustion
+    DiskFull,           // Storage full
+}
+
+pub struct ChaosTestFramework {
+    active_scenarios: Vec<ChaosScenario>,
+}
+
+impl ChaosTestFramework {
+    pub async fn inject(&mut self, scenario: ChaosScenario) {
+        match scenario {
+            ChaosScenario::CameraFailure => {
+                // Simulate camera hardware failure
+                hardware.camera.fail();
+                // Verify system falls back to voice-only
+                assert!(system.is_voice_only_mode());
+            },
+            ChaosScenario::NetworkPartition => {
+                // Drop all network connections
+                network.disconnect_all_peers();
+                // Verify system continues offline
+                assert!(system.can_operate_offline());
+            },
+            // ... more scenarios
+        }
+    }
+}
+```
+
+**Tests**: 34 tests covering minimal mode, health monitoring, feature gates, chaos scenarios
+
+---
+
+## Phase 49: Progressive Disclosure UX
+
+**Purpose**: 80% reduction in cognitive load for mainstream users
+
+### Simple Intents (`ux/simple_intents.rs`)
+
+```rust
+pub struct IntentExpander {
+    templates: Vec<IntentTemplate>,
+    history: VecDeque<SimpleIntent>,
+}
+
+pub enum SimpleIntent {
+    Message { recipient: String, content: Option<String> },
+    Call { recipient: String },
+    Navigate { destination: String },
+    Search { query: String },
+    Play { content: String },
+    Photo,
+    Video,
+    Timer { duration: String },
+    Reminder { content: String, when: Option<String> },
+    Open { app: String },
+    Share { content: String },
+    Pay { recipient: String, amount: Option<String> },
+}
+
+pub struct IntentTemplate {
+    pattern: String,              // "Hey, {action} {target}"
+    action: SimpleAction,
+    required_params: Vec<String>,
+    optional_params: Vec<String>,
+}
+```
+
+**Natural Language Patterns**:
+```
+"Hey, message Mom" → SimpleIntent::Message { recipient: "Mom", content: None }
+"Hey, call Sarah" → SimpleIntent::Call { recipient: "Sarah" }
+"Hey, navigate home" → SimpleIntent::Navigate { destination: "home" }
+"Hey, play music" → SimpleIntent::Play { content: "music" }
+"Hey, set timer 5 minutes" → SimpleIntent::Timer { duration: "5 minutes" }
+```
+
+**Intent Expansion**:
+```rust
+impl IntentExpander {
+    pub fn expand(&self, simple: SimpleIntent) -> Intent {
+        match simple {
+            SimpleIntent::Message { recipient, content } => {
+                // Expand to full intent
+                Intent::SendMessage {
+                    recipient: self.resolve_contact(recipient),
+                    content: content.unwrap_or_else(|| self.prompt_for_content()),
+                    encryption: EncryptionType::EndToEnd,
+                    priority: MessagePriority::Normal,
+                }
+            },
+            SimpleIntent::Navigate { destination } => {
+                Intent::Navigate {
+                    destination: self.resolve_location(destination),
+                    mode: TransportMode::Auto,
+                    ar_overlay: true,
+                    traffic_aware: true,
+                }
+            },
+            // ... more expansions
+        }
+    }
+}
+```
+
+### Smart Defaults (`ux/smart_defaults.rs`)
+
+```rust
+pub struct SmartDefaults {
+    context: DefaultContext,
+    patterns: LearnedPatterns,
+}
+
+pub struct DefaultContext {
+    current_time: SystemTime,
+    current_location: Option<Location>,
+    recent_contacts: Vec<Contact>,
+    recent_locations: Vec<Location>,
+}
+
+pub struct LearnedPatterns {
+    frequent_contacts: HashMap<String, f32>,  // name → frequency
+    time_patterns: HashMap<Hour, Vec<Action>>, // hour → common actions
+    location_patterns: HashMap<Location, Vec<Action>>,
+}
+
+impl SmartDefaults {
+    pub fn suggest_time(&self, intent: &str) -> SystemTime {
+        // "remind me tomorrow" at 8pm → suggests 9am next day
+        if intent.contains("tomorrow") && self.context.current_time.hour() > 18 {
+            return self.context.current_time + Duration::from_hours(13);
+        }
+        // "lunch meeting" → suggests 12:00pm
+        if intent.contains("lunch") {
+            return self.next_occurrence_of(12, 0);
+        }
+        // Default: 1 hour from now
+        self.context.current_time + Duration::from_hours(1)
+    }
+    
+    pub fn suggest_contact(&self, partial: &str) -> Vec<Contact> {
+        // Combine: recent contacts + frequent contacts + name match
+        let mut candidates = Vec::new();
+        candidates.extend(self.match_recent(partial));
+        candidates.extend(self.match_frequent(partial));
+        candidates.extend(self.match_name(partial));
+        candidates.sort_by_score();
+        candidates.take(5)
+    }
+}
+```
+
+**Context-Aware Suggestions**:
+```
+5:00pm, near home:
+  "Hey, navigate" → suggests "home"
+
+9:00am, weekday:
+  "Hey, call" → suggests work contacts
+
+Saturday 2pm:
+  "Hey, remind me" → suggests tomorrow 9am (not tonight)
+```
+
+### Interactive Tutorials (`ux/tutorials.rs`)
+
+```rust
+pub struct TutorialManager {
+    tutorials: HashMap<TutorialId, Tutorial>,
+    user_progress: HashMap<TutorialId, TutorialProgress>,
+}
+
+pub enum TutorialCategory {
+    Basics,      // First-time setup, basic navigation
+    Voice,       // Voice commands
+    Gestures,    // Hand gestures
+    Apps,        // Using apps
+    Advanced,    // Power user features
+}
+
+pub struct Tutorial {
+    id: TutorialId,
+    title: String,
+    category: TutorialCategory,
+    steps: Vec<TutorialStep>,
+    estimated_duration: Duration,
+}
+
+pub struct TutorialStep {
+    instruction: String,
+    demo: Option<DemoVideo>,
+    validation: Box<dyn Fn(&SystemState) -> bool>,
+    hint: Option<String>,
+}
+```
+
+**Built-in Tutorials**:
+```
+1. "Welcome to Kāraṇa" (5 min)
+   - Step 1: Say "Hey Kāraṇa" to wake up
+   - Step 2: Try "Hey, what time is it?"
+   - Step 3: Look at an object and say "What is this?"
+
+2. "Voice Commands" (3 min)
+   - Common patterns
+   - Disambiguation
+   - Error correction
+
+3. "Hand Gestures" (7 min)
+   - Pinch to select
+   - Swipe to navigate
+   - Grab to move
+
+4. "Running Apps" (5 min)
+   - Opening YouTube
+   - Controlling with voice
+   - Spatial positioning
+```
+
+### Persona Profiles (`ux/personas.rs`)
+
+```rust
+pub enum UserPersona {
+    Casual,        // Minimal tech knowledge
+    Professional,  // Business user
+    Developer,     // Technical user
+    PowerUser,     // Advanced features
+}
+
+pub struct PersonaManager {
+    current_persona: UserPersona,
+    preferences: PersonaPreferences,
+}
+
+pub struct PersonaPreferences {
+    complexity_level: ComplexityLevel,
+    feature_visibility: HashMap<Feature, bool>,
+    default_actions: HashMap<Intent, Action>,
+    privacy_mode: PrivacyMode,
+}
+
+pub enum ComplexityLevel {
+    Simple,    // Hide advanced features
+    Moderate,  // Show some advanced features
+    Advanced,  // Show most features
+    Expert,    // Show everything
+}
+```
+
+**Persona Customization**:
+```
+Casual Persona:
+  - Simple voice templates only
+  - Auto-enable smart defaults
+  - Hide technical details
+  - Maximum privacy by default
+  
+Developer Persona:
+  - Show all capabilities
+  - Enable debugging features
+  - Expose API details
+  - Allow manual overrides
+```
+
+**Tests**: 25 tests covering intents, defaults, tutorials, personas
+
+---
+
+## Phase 50: Privacy-First Data Management
+
+**Purpose**: 90% reduction in stored sensitive data, full user control
+
+### Data Retention (`privacy/retention.rs`)
+
+```rust
+pub enum DataCategory {
+    Messages,      // Text/voice messages
+    MediaFiles,    // Photos, videos
+    Browsing,      // Web history
+    Location,      // GPS traces
+    Contacts,      // Contact interactions
+    Calendar,      // Events, meetings
+    Health,        // Wellness data
+    Transactions,  // Payment history
+}
+
+pub struct RetentionPolicy {
+    category: DataCategory,
+    max_age: Option<Duration>,
+    max_count: Option<usize>,
+    protected: bool,  // Prevent auto-deletion
+}
+
+pub struct DataRetentionManager {
+    policies: HashMap<DataCategory, RetentionPolicy>,
+    last_cleanup: SystemTime,
+}
+
+impl DataRetentionManager {
+    pub async fn apply_policies(&mut self) {
+        for (category, policy) in &self.policies {
+            let items = self.load_category_items(category);
+            
+            // Age-based cleanup
+            if let Some(max_age) = policy.max_age {
+                let cutoff = SystemTime::now() - max_age;
+                items.retain(|item| item.timestamp > cutoff);
+            }
+            
+            // Count-based cleanup
+            if let Some(max_count) = policy.max_count {
+                if items.len() > max_count {
+                    items.sort_by_timestamp();
+                    items.truncate(max_count);
+                }
+            }
+            
+            self.save_category_items(category, items);
+        }
+    }
+}
+```
+
+**Default Policies**:
+```
+Messages: Delete after 30 days or keep last 1000
+MediaFiles: Delete after 90 days
+Browsing: Delete after 7 days
+Location: Delete after 24 hours
+Contacts: Keep forever (protected)
+Calendar: Keep forever (protected)
+Health: Delete after 30 days
+Transactions: Keep forever (protected)
+```
+
+### Ephemeral Mode (`privacy/ephemeral.rs`)
+
+```rust
+pub struct EphemeralModeManager {
+    active: bool,
+    session_start: Option<SystemTime>,
+    session_data: Vec<DataItem>,
+}
+
+pub enum EphemeralMode {
+    Off,
+    Temporary,    // Manual session
+    AutoPrivate,  // Auto-enable in public zones
+}
+
+impl EphemeralModeManager {
+    pub async fn start_session(&mut self) {
+        self.active = true;
+        self.session_start = Some(SystemTime::now());
+        self.session_data.clear();
+        
+        // Mark all new data as ephemeral
+        self.tag_new_data_as_ephemeral();
+    }
+    
+    pub async fn end_session(&mut self) {
+        // Delete all session data
+        for item in &self.session_data {
+            self.delete_item(item).await;
+        }
+        
+        self.active = false;
+        self.session_start = None;
+        self.session_data.clear();
+    }
+}
+```
+
+**Ephemeral Mode Behavior**:
+```
+Session active:
+  - All photos → deleted on session end
+  - All messages → deleted on session end
+  - All browsing → deleted on session end
+  - No persistent logs
+
+Session ends (manual or auto):
+  - Zero trace left on device
+  - No recovery possible
+```
+
+### Permission Tracking (`privacy/permissions.rs`)
+
+```rust
+pub enum Permission {
+    Camera,
+    Microphone,
+    Location,
+    Contacts,
+    Files,
+    Network,
+    Notifications,
+    Bluetooth,
+}
+
+pub struct PermissionTracker {
+    active_permissions: HashMap<Permission, Vec<UsageRecord>>,
+    usage_stats: HashMap<Permission, PermissionStats>,
+}
+
+pub struct UsageRecord {
+    permission: Permission,
+    app: String,
+    timestamp: SystemTime,
+    duration: Duration,
+    context: UsageContext,
+}
+
+pub struct PermissionStats {
+    total_uses: u64,
+    total_duration: Duration,
+    apps: HashMap<String, u64>,  // app → use count
+    hourly_pattern: [u64; 24],   // uses per hour
+}
+
+impl PermissionTracker {
+    pub fn record_usage(&mut self, permission: Permission, app: &str) {
+        let record = UsageRecord {
+            permission,
+            app: app.to_string(),
+            timestamp: SystemTime::now(),
+            duration: Duration::from_secs(0),  // Updated on stop
+            context: self.current_context(),
+        };
+        
+        self.active_permissions
+            .entry(permission)
+            .or_default()
+            .push(record);
+        
+        // Visual indicator
+        self.show_permission_indicator(permission);
+    }
+    
+    pub fn generate_report(&self) -> PermissionReport {
+        // Daily summary of all permission usage
+    }
+}
+```
+
+**Real-Time Indicators**:
+```
+Camera active: Green dot in HUD
+Microphone active: Red dot in HUD
+Location tracking: Blue dot in HUD
+Multiple active: Combined indicator
+```
+
+### Privacy Manager (`privacy/mod.rs`)
+
+```rust
+pub enum PrivacyMode {
+    Standard,   // Default policies
+    Enhanced,   // Stricter policies
+    Maximum,    // Paranoid mode
+}
+
+pub enum PrivacyZone {
+    Home,       // Relaxed policies
+    Work,       // Moderate policies
+    Public,     // Strict policies
+    Travel,     // Enhanced tracking protection
+    Shopping,   // Minimal data collection
+}
+
+pub struct PrivacyManager {
+    mode: PrivacyMode,
+    zone: PrivacyZone,
+    retention: DataRetentionManager,
+    ephemeral: EphemeralModeManager,
+    permissions: PermissionTracker,
+}
+
+impl PrivacyManager {
+    pub fn determine_zone(&self, location: &Location) -> PrivacyZone {
+        // Geo-fence based zone detection
+        if self.is_home(location) { PrivacyZone::Home }
+        else if self.is_work(location) { PrivacyZone::Work }
+        else if self.is_airport_or_hotel(location) { PrivacyZone::Travel }
+        else if self.is_shopping_area(location) { PrivacyZone::Shopping }
+        else { PrivacyZone::Public }
+    }
+    
+    pub fn auto_adjust(&mut self, zone: PrivacyZone) {
+        match zone {
+            PrivacyZone::Public => {
+                // Strictest settings
+                self.ephemeral.start_session();
+                self.permissions.require_confirmation_for_all();
+            },
+            PrivacyZone::Home => {
+                // Relaxed settings
+                self.ephemeral.end_session();
+                self.permissions.allow_remembered_permissions();
+            },
+            // ... more zone adjustments
+        }
+    }
+}
+```
+
+**Privacy Zone Policies**:
+```
+Home Zone:
+  - Remember permissions
+  - Standard retention (30 days)
+  - No ephemeral mode
+  
+Public Zone:
+  - Confirm every permission
+  - Enhanced retention (7 days)
+  - Auto ephemeral mode
+  
+Travel Zone:
+  - Location tracking minimized
+  - Enhanced encryption
+  - Frequent data cleanup
+```
+
+**Tests**: 32 tests (8 retention + 7 ephemeral + 7 permissions + 10 manager)
+
+---
+
+## Phase 51: App Ecosystem & Native Apps
+
+**Purpose**: Enable mainstream app adoption on AR glasses
+
+### Intent Protocol (`app_ecosystem/intent_protocol.rs`)
+
+```rust
+pub enum IntentType {
+    Network { action: NetworkAction },
+    Ledger { action: LedgerAction },
+    Oracle { action: OracleAction },
+    AI { action: AIAction },
+    Share { content: String, target: Option<String> },
+    Store { key: String, value: Vec<u8> },
+    Query { key: String },
+    Camera { mode: CameraMode },
+    Microphone { mode: MicMode },
+    Location,
+    OpenApp { app_id: String },
+    SendData { app_id: String, data: Vec<u8> },
+}
+
+pub enum NetworkAction {
+    HttpRequest { url: String, method: String },
+    WebSocket { url: String },
+    P2PMessage { peer_id: String, data: Vec<u8> },
+}
+
+pub enum LedgerAction {
+    SendTransaction { to: String, amount: u64 },
+    QueryBalance { address: String },
+    GetHistory { address: String, limit: usize },
+}
+
+pub enum OracleAction {
+    GetPrice { symbol: String },
+    GetWeather { location: String },
+    Custom { query: String },
+}
+
+pub enum AIAction {
+    TextGeneration { prompt: String, max_tokens: usize },
+    ImageRecognition { image: Vec<u8> },
+    VoiceToText { audio: Vec<u8> },
+    GetEmbedding { text: String },
+}
+
+pub struct IntentRouter {
+    apps: HashMap<String, AppHandle>,
+    permissions: PermissionManager,
+}
+
+impl IntentRouter {
+    pub async fn route_intent(&self, 
+        app_id: &str, 
+        intent: IntentType
+    ) -> Result<IntentResponse> {
+        // 1. Validate permission
+        if !self.permissions.has_permission(app_id, &intent) {
+            return Err("Permission denied");
+        }
+        
+        // 2. Route to appropriate layer
+        match intent {
+            IntentType::Network { action } => {
+                self.handle_network(app_id, action).await
+            },
+            IntentType::Ledger { action } => {
+                self.handle_ledger(app_id, action).await
+            },
+            IntentType::AI { action } => {
+                self.handle_ai(app_id, action).await
+            },
+            // ... more routing
+        }
+    }
+}
+```
+
+**Example App Communication**:
+```rust
+// YouTube app wants to stream video
+IntentType::Network {
+    action: NetworkAction::HttpRequest {
+        url: "https://youtube.com/watch?v=...",
+        method: "GET",
+    }
+}
+
+// WhatsApp wants to send message
+IntentType::Ledger {
+    action: LedgerAction::SendTransaction {
+        to: recipient_address,
+        amount: 0,  // Free message
+    }
+}
+
+// Instagram wants AI image recognition
+IntentType::AI {
+    action: AIAction::ImageRecognition {
+        image: photo_bytes,
+    }
+}
+```
+
+### Android Container (`app_ecosystem/android_container.rs`)
+
+```rust
+pub struct AndroidContainer {
+    state: ContainerState,
+    properties: AndroidProperties,
+    apps: HashMap<String, AndroidApp>,
+}
+
+pub struct AndroidProperties {
+    screen_width: u32,
+    screen_height: u32,
+    dpi: u32,
+    api_level: u32,
+    hardware_features: Vec<String>,
+}
+
+pub struct AndroidApp {
+    package_name: String,
+    activity: String,
+    lifecycle_state: ActivityState,
+    permissions: Vec<String>,
+}
+
+pub enum ActivityState {
+    Created,
+    Started,
+    Resumed,
+    Paused,
+    Stopped,
+    Destroyed,
+}
+
+impl AndroidContainer {
+    pub async fn launch_app(&mut self, package: &str) -> Result<()> {
+        // Waydroid-like approach
+        // 1. Check if container running
+        if !self.is_running() {
+            self.start_container().await?;
+        }
+        
+        // 2. Launch Android activity
+        let app = self.apps.get_mut(package)
+            .ok_or("App not installed")?;
+        
+        app.lifecycle_state = ActivityState::Created;
+        self.send_intent_to_android(package).await?;
+        app.lifecycle_state = ActivityState::Started;
+        app.lifecycle_state = ActivityState::Resumed;
+        
+        Ok(())
+    }
+}
+```
+
+**Container Features**:
+- Screen virtualization (1920x1080 → AR display)
+- Touch event translation (gaze → touch)
+- Audio routing (Android audio → spatial audio)
+- Clipboard sync
+- Notification forwarding
+
+### Native Apps (`app_ecosystem/native_apps.rs`)
+
+```rust
+pub struct NativeApp {
+    id: String,
+    name: String,
+    category: AppCategory,
+    optimizations: AROptimizations,
+    karana_integration: KaranaIntegration,
+}
+
+pub enum AppCategory {
+    Video,
+    Communication,
+    Social,
+    Productivity,
+    Entertainment,
+    Shopping,
+    Navigation,
+}
+
+pub struct AROptimizations {
+    spatial_controls: bool,     // Can position in 3D
+    voice_commands: Vec<String>,
+    gesture_support: bool,
+    gaze_targeting: bool,
+}
+
+pub struct KaranaIntegration {
+    wallet_connected: bool,     // Use Kāraṇa wallet
+    privacy_config: PrivacyConfig,
+    resource_profile: ResourceProfile,
+}
+```
+
+**Pre-Configured Apps** (15 total):
+
+1. **YouTube**
+```rust
+NativeApp {
+    id: "com.google.android.youtube",
+    optimizations: AROptimizations {
+        spatial_controls: true,
+        voice_commands: vec![
+            "play video",
+            "pause",
+            "next video",
+            "search for {query}",
+        ],
+        gesture_support: true,  // Swipe to skip
+        gaze_targeting: true,    // Look at video to focus
+    },
+    karana_integration: KaranaIntegration {
+        wallet_connected: true,  // Subscribe with Kāraṇa tokens
+        privacy_config: PrivacyConfig {
+            block_tracking: true,
+            ephemeral_history: true,
+        },
+    },
+}
+```
+
+2. **WhatsApp**
+```rust
+NativeApp {
+    id: "com.whatsapp",
+    optimizations: AROptimizations {
+        voice_commands: vec![
+            "call {contact}",
+            "message {contact}",
+            "read messages",
+        ],
+        gesture_support: false,  // Voice-first
+        gaze_targeting: true,    // Look at contact to select
+    },
+    karana_integration: KaranaIntegration {
+        wallet_connected: false,  // Uses own system
+        privacy_config: PrivacyConfig {
+            e2e_encryption: true,
+            local_storage: true,
+        },
+    },
+}
+```
+
+3-15: Gmail, Google Maps, Spotify, Instagram, Twitter, TikTok, Netflix, Amazon, Uber, Zoom, Discord, Telegram, Browser
+
+### App Store (`app_ecosystem/app_store.rs`)
+
+```rust
+pub struct AppStore {
+    listings: HashMap<String, AppListing>,
+    security_scanner: SecurityScanner,
+}
+
+pub struct AppListing {
+    app_id: String,
+    name: String,
+    developer: String,
+    version: semver::Version,
+    rating: f32,
+    downloads: u64,
+    screenshots: Vec<String>,
+    security_status: SecurityStatus,
+    sandbox_profile: SandboxProfile,
+}
+
+pub enum SecurityStatus {
+    Verified,      // Passed all checks
+    Unverified,    // Not yet scanned
+    Suspicious,    // Warning signs detected
+    Malicious,     // Known malware
+}
+
+pub enum SandboxProfile {
+    Strict,     // Minimal permissions, isolated
+    Moderate,   // Standard permissions
+    Relaxed,    // More permissions (verified apps only)
+}
+
+pub struct SecurityScanner {
+    malware_signatures: Vec<Signature>,
+    permission_analyzer: PermissionAnalyzer,
+}
+
+impl SecurityScanner {
+    pub async fn scan_app(&self, apk: &[u8]) -> SecurityReport {
+        let mut report = SecurityReport::default();
+        
+        // 1. Malware signature scan
+        report.malware_detected = self.check_signatures(apk);
+        
+        // 2. Permission analysis
+        let perms = self.extract_permissions(apk);
+        report.excessive_permissions = self.analyze_permissions(&perms);
+        
+        // 3. Network behavior analysis
+        report.suspicious_urls = self.analyze_network_calls(apk);
+        
+        // 4. Code obfuscation detection
+        report.obfuscated = self.detect_obfuscation(apk);
+        
+        report
+    }
+}
+```
+
+**Security Flow**:
+```
+App submission
+    ↓
+Automated scan
+    ↓
+Permission analysis
+    ↓
+Network behavior check
+    ↓
+Code review (for popular apps)
+    ↓
+Verification badge (if passed)
+    ↓
+Listed in store
+```
+
+**Tests**: Verified individually per module (intent protocol, container, native apps, store)
+
+---
+
+## Phase 52: Distributed Compute
+
+**Purpose**: Run 70B+ models via edge cloud integration
+
+### Compute Node Protocol (`distributed/compute_node.rs`)
+
+```rust
+pub struct ComputeNode {
+    id: String,
+    capabilities: NodeCapabilities,
+    status: NodeStatus,
+    resources: NodeResources,
+    location: NodeLocation,
+}
+
+pub struct NodeCapabilities {
+    cpu_cores: u32,
+    cpu_freq_ghz: f32,
+    gpu_memory_gb: f32,
+    ram_gb: f32,
+    storage_gb: f32,
+    acceleration: Vec<HardwareAccel>,
+}
+
+pub enum HardwareAccel {
+    CUDA { compute_capability: String },
+    Metal,
+    ROCm,
+    OpenCL,
+    Vulkan,
+    NPU,
+    TPU,
+}
+
+pub enum NodeStatus {
+    Available,
+    Busy,
+    Offline,
+    Unreachable,
+    Maintenance,
+}
+
+pub struct NodeResources {
+    cpu_usage: f32,      // 0.0-1.0
+    gpu_usage: f32,
+    memory_used_gb: f32,
+    memory_total_gb: f32,
+}
+
+pub struct NodeLocation {
+    lat: f64,
+    lon: f64,
+    latency_ms: f32,     // Measured latency to this node
+}
+
+pub struct ComputeNodeProtocol {
+    discovered_nodes: HashMap<String, ComputeNode>,
+    local_node: ComputeNode,
+}
+
+impl ComputeNodeProtocol {
+    pub async fn discover_nodes(&mut self) -> Result<Vec<ComputeNode>> {
+        // 1. Broadcast discovery message on local network
+        let peers = self.network.discover_local_peers().await?;
+        
+        // 2. Query each peer for capabilities
+        for peer in peers {
+            let capabilities = self.query_capabilities(&peer).await?;
+            let resources = self.query_resources(&peer).await?;
+            
+            self.discovered_nodes.insert(peer.id.clone(), ComputeNode {
+                id: peer.id,
+                capabilities,
+                status: NodeStatus::Available,
+                resources,
+                location: self.measure_location(&peer).await?,
+            });
+        }
+        
+        Ok(self.discovered_nodes.values().cloned().collect())
+    }
+    
+    pub fn select_nodes(&self, 
+        requirements: &ComputeRequirements
+    ) -> Vec<ComputeNode> {
+        self.discovered_nodes.values()
+            .filter(|node| node.meets_requirements(requirements))
+            .sorted_by_latency()
+            .take(requirements.max_nodes)
+            .cloned()
+            .collect()
+    }
+}
+```
+
+**Node Discovery Flow**:
+```
+1. Broadcast mDNS: "Kāraṇa compute node"
+2. Receive responses with capabilities
+3. Measure latency to each node
+4. Store in registry
+5. Periodically refresh (every 10s)
+```
+
+### Model Partitioning (`distributed/model_partitioning.rs`)
+
+```rust
+pub enum PartitionStrategy {
+    LayerWise,      // Split by transformer layers
+    TensorParallel, // Split tensors horizontally
+    Pipeline,       // Pipeline parallelism
+    Hybrid,         // Combination of above
+}
+
+pub struct ModelPartitioner {
+    strategy: PartitionStrategy,
+}
+
+pub struct ModelPartition {
+    id: usize,
+    layer_range: Option<(usize, usize)>,  // For LayerWise
+    tensor_slice: Option<TensorSlice>,     // For TensorParallel
+    stage: Option<usize>,                  // For Pipeline
+    memory_required_gb: f32,
+    compute_required_tflops: f32,
+}
+
+pub struct PartitionedModel {
+    model_name: String,
+    total_layers: usize,
+    total_params: u64,
+    partitions: Vec<ModelPartition>,
+    coordination_overhead_ms: f32,
+}
+
+impl ModelPartitioner {
+    pub fn partition(&self, 
+        model_info: &ModelInfo, 
+        num_nodes: usize
+    ) -> PartitionedModel {
+        match self.strategy {
+            PartitionStrategy::LayerWise => {
+                self.partition_by_layers(model_info, num_nodes)
+            },
+            PartitionStrategy::TensorParallel => {
+                self.partition_by_tensors(model_info, num_nodes)
+            },
+            PartitionStrategy::Pipeline => {
+                self.partition_by_pipeline(model_info, num_nodes)
+            },
+            PartitionStrategy::Hybrid => {
+                self.partition_hybrid(model_info, num_nodes)
+            },
+        }
+    }
+    
+    fn partition_by_layers(&self, 
+        model: &ModelInfo, 
+        num_nodes: usize
+    ) -> PartitionedModel {
+        let layers_per_node = model.total_layers / num_nodes;
+        let mut partitions = Vec::new();
+        
+        for i in 0..num_nodes {
+            let start = i * layers_per_node;
+            let end = if i == num_nodes - 1 {
+                model.total_layers
+            } else {
+                (i + 1) * layers_per_node
+            };
+            
+            partitions.push(ModelPartition {
+                id: i,
+                layer_range: Some((start, end)),
+                tensor_slice: None,
+                stage: None,
+                memory_required_gb: model.memory_per_layer * (end - start) as f32,
+                compute_required_tflops: model.compute_per_layer * (end - start) as f32,
+            });
+        }
+        
+        PartitionedModel {
+            model_name: model.name.clone(),
+            total_layers: model.total_layers,
+            total_params: model.total_params,
+            partitions,
+            coordination_overhead_ms: 5.0 * num_nodes as f32,  // Sequential
+        }
+    }
+}
+```
+
+**Partition Strategies**:
+
+1. **LayerWise**: Sequential execution across nodes
+```
+Node 1: Layers 0-15  (16 layers)
+Node 2: Layers 16-31 (16 layers)
+Node 3: Layers 32-47 (16 layers)
+Node 4: Layers 48-63 (16 layers)
+
+Total: 64 layers (e.g., LLaMA-70B)
+Coordination: Sequential, ~20ms overhead
+```
+
+2. **TensorParallel**: Parallel tensor operations
+```
+Node 1: Left half of all weight matrices
+Node 2: Right half of all weight matrices
+
+Each node processes same input, combines outputs
+Coordination: Frequent, ~50ms overhead
+```
+
+3. **Pipeline**: Pipelined execution
+```
+Stage 1 (Node 1): Process batch 1
+Stage 2 (Node 2): Process batch 2 while Node 1 does batch 3
+Stage 3 (Node 3): Process batch 3 while Node 2 does batch 4
+
+Throughput optimized, ~30ms overhead
+```
+
+4. **Hybrid**: Pipeline + Tensor Parallel
+```
+Stage 1: Nodes 1-2 (tensor parallel)
+Stage 2: Nodes 3-4 (tensor parallel)
+
+Best of both worlds, ~40ms overhead
+```
+
+### Distributed Inference (`distributed/distributed_inference.rs`)
+
+```rust
+pub struct DistributedInference {
+    partitioner: ModelPartitioner,
+    node_protocol: ComputeNodeProtocol,
+    active_requests: HashMap<Uuid, InferenceRequest>,
+}
+
+pub struct InferenceRequest {
+    id: Uuid,
+    model: String,
+    input: InferenceInput,
+    parameters: InferenceParameters,
+    assigned_nodes: Vec<String>,
+}
+
+pub enum InferenceInput {
+    Text(String),
+    Tokens(Vec<u32>),
+    Image(Vec<u8>),
+    Audio(Vec<f32>),
+    Multimodal { text: String, image: Vec<u8> },
+}
+
+pub struct InferenceParameters {
+    max_tokens: usize,
+    temperature: f32,
+    top_p: f32,
+    top_k: usize,
+}
+
+pub struct InferenceResponse {
+    request_id: Uuid,
+    output: InferenceOutput,
+    metrics: InferenceMetrics,
+}
+
+pub enum InferenceOutput {
+    Text(String),
+    Tokens(Vec<u32>),
+    Image(Vec<u8>),
+    Embedding(Vec<f32>),
+    Error(String),
+}
+
+pub struct InferenceMetrics {
+    total_latency_ms: f32,
+    tokens_per_second: f32,
+    nodes_used: usize,
+    coordination_overhead_ms: f32,
+}
+
+impl DistributedInference {
+    pub async fn infer(&mut self, 
+        model: &str, 
+        input: InferenceInput,
+        params: InferenceParameters,
+    ) -> Result<InferenceResponse> {
+        let request_id = Uuid::new_v4();
+        
+        // 1. Discover available nodes
+        let nodes = self.node_protocol.discover_nodes().await?;
+        
+        // 2. Partition model across nodes
+        let model_info = self.get_model_info(model)?;
+        let partitioned = self.partitioner.partition(&model_info, nodes.len());
+        
+        // 3. Assign partitions to nodes
+        let assigned = self.assign_partitions(&partitioned, &nodes)?;
+        
+        // 4. Coordinate execution
+        let start = Instant::now();
+        let output = match partitioned.strategy {
+            PartitionStrategy::LayerWise => {
+                self.execute_sequential(&assigned, &input, &params).await?
+            },
+            PartitionStrategy::TensorParallel => {
+                self.execute_parallel(&assigned, &input, &params).await?
+            },
+            PartitionStrategy::Pipeline => {
+                self.execute_pipelined(&assigned, &input, &params).await?
+            },
+            PartitionStrategy::Hybrid => {
+                self.execute_hybrid(&assigned, &input, &params).await?
+            },
+        };
+        let latency = start.elapsed().as_secs_f32() * 1000.0;
+        
+        // 5. Return response with metrics
+        Ok(InferenceResponse {
+            request_id,
+            output,
+            metrics: InferenceMetrics {
+                total_latency_ms: latency,
+                tokens_per_second: self.calculate_tps(&output, latency),
+                nodes_used: assigned.len(),
+                coordination_overhead_ms: partitioned.coordination_overhead_ms,
+            },
+        })
+    }
+}
+```
+
+**Execution Flow**:
+```
+User request: "Explain quantum computing"
+    ↓
+1. Discover 4 nodes (laptop, phone, desktop, friend's device)
+2. Partition LLaMA-70B across nodes (LayerWise)
+3. Node 1: Layers 0-15 → intermediate output
+4. Node 2: Layers 16-31 → intermediate output
+5. Node 3: Layers 32-47 → intermediate output
+6. Node 4: Layers 48-63 → final output
+7. Stream tokens back to user
+    ↓
+Response: "Quantum computing is..." (120ms latency, 85 tokens/sec)
+```
+
+### Edge Cloud Pooling (`distributed/edge_cloud.rs`)
+
+```rust
+pub struct EdgeCloudPool {
+    pools: HashMap<String, ResourcePool>,
+}
+
+pub struct ResourcePool {
+    name: String,
+    nodes: Vec<ComputeNode>,
+    policy: PoolPolicy,
+    capacity: PoolCapacity,
+}
+
+pub struct PoolPolicy {
+    max_nodes: usize,
+    min_nodes: usize,
+    auto_scale: bool,
+    priority: PoolPriority,
+    workload_type: WorkloadType,
+}
+
+pub enum PoolPriority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+pub enum WorkloadType {
+    Inference,          // AI inference
+    Training,           // Model training
+    DataProcessing,     // ETL, analytics
+    Rendering,          // 3D rendering
+    Gaming,             // Real-time gaming
+    General,            // Mixed workloads
+}
+
+pub struct PoolCapacity {
+    total_cpu_cores: u32,
+    total_gpu_memory_gb: f32,
+    total_ram_gb: f32,
+    available_cpu_cores: u32,
+    available_gpu_memory_gb: f32,
+    available_ram_gb: f32,
+}
+
+pub enum NodeSelectionStrategy {
+    RoundRobin,     // Rotate through nodes
+    LeastLoaded,    // Pick least busy
+    LowestLatency,  // Pick fastest
+    MostCapable,    // Pick most powerful
+    Random,         // Random selection
+}
+
+impl EdgeCloudPool {
+    pub async fn allocate(&mut self, 
+        pool_name: &str,
+        requirements: &ComputeRequirements,
+        strategy: NodeSelectionStrategy,
+    ) -> Result<Vec<ComputeNode>> {
+        let pool = self.pools.get_mut(pool_name)
+            .ok_or("Pool not found")?;
+        
+        // 1. Check if enough capacity
+        if !pool.has_capacity(requirements) {
+            if pool.policy.auto_scale {
+                self.scale_up(pool_name).await?;
+            } else {
+                return Err("Insufficient capacity");
+            }
+        }
+        
+        // 2. Select nodes based on strategy
+        let selected = match strategy {
+            NodeSelectionStrategy::LeastLoaded => {
+                pool.nodes.iter()
+                    .filter(|n| n.meets_requirements(requirements))
+                    .min_by_key(|n| n.resources.cpu_usage as u32)
+            },
+            NodeSelectionStrategy::LowestLatency => {
+                pool.nodes.iter()
+                    .filter(|n| n.meets_requirements(requirements))
+                    .min_by_key(|n| n.location.latency_ms as u32)
+            },
+            // ... more strategies
+        };
+        
+        // 3. Reserve resources
+        if let Some(node) = selected {
+            self.reserve_resources(node, requirements)?;
+            Ok(vec![node.clone()])
+        } else {
+            Err("No suitable nodes found")
+        }
+    }
+    
+    pub async fn scale_up(&mut self, pool_name: &str) -> Result<()> {
+        // Discover new nodes and add to pool
+    }
+    
+    pub async fn scale_down(&mut self, pool_name: &str) -> Result<()> {
+        // Remove underutilized nodes from pool
+    }
+}
+```
+
+**Auto-Scaling Logic**:
+```
+Pool utilization > 80% for 5 minutes → Scale up (add nodes)
+Pool utilization < 20% for 10 minutes → Scale down (remove nodes)
+
+Scale up:
+  1. Discover new capable nodes
+  2. Add to pool
+  3. Redistribute workload
+
+Scale down:
+  1. Identify least-used nodes
+  2. Drain workload to other nodes
+  3. Remove from pool
+```
+
+**Example Pool Configuration**:
+```rust
+ResourcePool {
+    name: "inference_pool",
+    nodes: vec![laptop, phone, desktop],
+    policy: PoolPolicy {
+        max_nodes: 10,
+        min_nodes: 2,
+        auto_scale: true,
+        priority: PoolPriority::High,
+        workload_type: WorkloadType::Inference,
+    },
+}
+```
+
+**Tests**: 28 tests covering node protocol, partitioning, inference coordination, pooling
+
+---
+
 ## Summary
 
-Kāraṇa OS uses a **9-layer modular architecture** where:
+Kāraṇa OS uses a **9-layer modular architecture with 8 cross-cutting systems** where:
 
 1. **Hardware** provides raw sensor inputs
 2. **Network** enables peer discovery & state sync
@@ -1150,4 +3070,14 @@ Kāraṇa OS uses a **9-layer modular architecture** where:
 8. **Applications** provide domain-specific functionality
 9. **System Services** ensure reliability & security
 
-The **Monad** orchestrator runs a 30-second tick loop, updating all layers synchronously while maintaining thread-safe state through atomic operations and message passing.
+**Cross-Cutting Systems** (Phases 46-52):
+- **Resource Management**: Adaptive optimization for constrained hardware
+- **Capability Architecture**: Decoupled layer interfaces with discovery
+- **Event Bus**: Async pub/sub communication between layers
+- **Resilience**: Graceful degradation and fault tolerance
+- **Progressive UX**: Mainstream accessibility with hidden complexity
+- **Privacy Management**: User-controlled data retention and protection
+- **App Ecosystem**: Native app support with AR optimizations
+- **Distributed Compute**: Edge cloud integration for large models
+
+The **Monad** orchestrator runs a 30-second tick loop, updating all layers synchronously while maintaining thread-safe state through atomic operations and message passing. Cross-cutting systems span all layers, providing horizontal services that enhance every layer's capabilities.
