@@ -28,6 +28,7 @@ pub mod event_bus; // Phase 47: Event bus architecture
 pub mod app_ecosystem; // Phase 51: App ecosystem with native app support
 pub mod capabilities; // Phase 54: New capability trait system for layers
 pub mod orchestrator; // Phase 54: Async event-driven orchestrator
+pub mod testing; // Phase 56: Chaos engineering and fault injection
 pub mod glasses;
 pub mod voice;
 pub mod voice_pipeline;
