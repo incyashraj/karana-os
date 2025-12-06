@@ -44,6 +44,784 @@
 
 ---
 
+## Master System Flow: Complete Layer Interaction
+
+This diagram shows how all 9 layers + cross-cutting systems interact during a typical user interaction:
+
+```
+USER: "Hey Kāraṇa, send 50 tokens to Mom"
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 7: INTERFACE                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
+│  │ VoiceManager │  │   HUD        │  │ GestureTrack │             │
+│  └──────┬───────┘  └──────▲───────┘  └──────────────┘             │
+│         │ audio            │ render                                 │
+│         │ stream           │ manifest                               │
+└─────────┼──────────────────┼────────────────────────────────────────┘
+          │                  │
+          ▼                  │
+┌─────────────────────────────────────────────────────────────────────┐
+│              CROSS-CUTTING: UX COORDINATOR                           │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │ SimpleIntents    │  │ SmartDefaults    │                        │
+│  │ "send to Mom" →  │  │ Resolve "Mom" →  │                        │
+│  │ Intent::Transfer │  │ mom_address      │                        │
+│  └────────┬─────────┘  └────────┬─────────┘                        │
+└───────────┼────────────────────┼──────────────────────────────────┘
+            │                    │
+            ▼                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 6: AI ENGINE                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
+│  │ NLU Engine   │→ │ Dialogue Mgr │→ │ Action Exec  │             │
+│  │ classify()   │  │ fill_slots() │  │ validate()   │             │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘             │
+│         │ Intent           │ context         │ ExecutionPlan       │
+└─────────┼──────────────────┼─────────────────┼───────────────────┘
+          │                  │                 │
+          ▼                  ▼                 ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              CROSS-CUTTING: EVENT BUS                                │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │ Event { category: AI, payload: IntentClassified }        │      │
+│  │ Event { category: User, payload: TransactionRequested }  │      │
+│  └─────────────────┬────────────────────────────────────────┘      │
+└────────────────────┼───────────────────────────────────────────────┘
+                     │ route_to_subscribers()
+                     ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 4: ORACLE BRIDGE                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
+│  │ OracleVeil   │→ │ IntentProver │→ │ Manifest Gen │             │
+│  │ process()    │  │ generate_zk()│  │ create_ui()  │             │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘             │
+│         │ Intent           │ ZKProof         │ UIManifest          │
+└─────────┼──────────────────┼─────────────────┼───────────────────┘
+          │                  │                 │
+          ▼                  ▼                 │
+┌─────────────────────────────────────────────┼───────────────────────┐
+│              CROSS-CUTTING: PRIVACY MANAGER  │                       │
+│  ┌──────────────────┐  ┌──────────────────┐│                       │
+│  │ PermissionTrack  │  │ DataRetention    ││                       │
+│  │ check_wallet()   │  │ log_transaction()││                       │
+│  └────────┬─────────┘  └────────┬─────────┘│                       │
+└───────────┼────────────────────┼───────────┼───────────────────────┘
+            │ ✓ Allowed          │           │
+            ▼                    ▼           │
+┌─────────────────────────────────────────────┼───────────────────────┐
+│                    LAYER 3: BLOCKCHAIN       │                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────▼─────┐                │
+│  │ Wallet       │→ │ Chain        │→ │ Celestia  │                │
+│  │ sign_tx()    │  │ add_block()  │  │ submit()  │                │
+│  └──────┬───────┘  └──────┬───────┘  └───────────┘                │
+│         │ Transaction      │ Block                                  │
+└─────────┼──────────────────┼────────────────────────────────────────┘
+          │                  │
+          ▼                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              CROSS-CUTTING: RESOURCE COORDINATOR                     │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │ AdaptiveLedger   │  │ ResourceMonitor  │                        │
+│  │ check_mode()     │  │ track_usage()    │                        │
+│  │ → Full Mode ✓    │  │ Battery: 65%     │                        │
+│  └────────┬─────────┘  └──────────────────┘                        │
+└───────────┼──────────────────────────────────────────────────────┘
+            │
+            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 2: P2P NETWORK                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
+│  │ libp2p Node  │→ │ Gossipsub    │→ │ BlockSync    │             │
+│  │ broadcast()  │  │ propagate()  │  │ sync_peers() │             │
+│  └──────────────┘  └──────────────┘  └──────────────┘             │
+│         │ Block propagated to 5 peers                               │
+└─────────┼──────────────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              CROSS-CUTTING: RESILIENCE COORDINATOR                   │
+│  ┌──────────────────┐  ┌──────────────────┐                        │
+│  │ HealthMonitor    │  │ FeatureGates     │                        │
+│  │ Layer3: Healthy  │  │ Blockchain: ✓    │                        │
+│  │ Layer2: Healthy  │  │ Network: ✓       │                        │
+│  └──────────────────┘  └──────────────────┘                        │
+└─────────────────────────────────────────────────────────────────────┘
+          │
+          ▼ (render result)
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 7: INTERFACE (Display)                      │
+│  ┌──────────────────────────────────────────────────────────┐      │
+│  │               HUD DISPLAYS:                               │      │
+│  │  ┌─────────────────────────────────────────────────┐     │      │
+│  │  │  ✓ Transaction Sent                             │     │      │
+│  │  │  50 KARA → Mom                                  │     │      │
+│  │  │  Block #42,891                                  │     │      │
+│  │  │  5 peers confirmed                              │     │      │
+│  │  └─────────────────────────────────────────────────┘     │      │
+│  └──────────────────────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 1: HARDWARE                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐             │
+│  │ Display      │  │ Speaker      │  │ Haptic       │             │
+│  │ render()     │  │ beep_success │  │ vibrate()    │             │
+│  └──────────────┘  └──────────────┘  └──────────────┘             │
+│         │ Visual + Audio + Haptic Feedback                          │
+└─────────┼──────────────────────────────────────────────────────────┘
+          │
+          ▼
+        USER: Sees confirmation, hears beep, feels vibration
+        
+⏱️ Total Time: ~150ms (voice→display)
+✓ All layers coordinated via Event Bus
+✓ Cross-cutting systems monitored health, resources, privacy
+✓ ZK proof generated (privacy preserved)
+✓ Transaction recorded on blockchain
+✓ Data retention policy applied
+```
+
+---
+
+## Layer-by-Layer Internal Flow Diagrams
+
+### Layer 1: Hardware Layer - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                       LAYER 1: HARDWARE                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │              HardwareManager::tick()                        │    │
+│  │           (Called every 16ms - 60 FPS)                      │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► CameraManager::capture_frame()                           │
+│       │    ├─► read_v4l2_device() / simulate_frame()                │
+│       │    ├─► apply_auto_exposure()                                │
+│       │    ├─► apply_white_balance()                                │
+│       │    └─► publish_event(Event::CameraFrameReady)               │
+│       │                                                              │
+│       ├──► SensorFusion::update()                                   │
+│       │    ├─► read_imu_data()                                      │
+│       │    ├─► read_gps_data()                                      │
+│       │    ├─► fuse_position() → WorldCoord                         │
+│       │    ├─► calculate_orientation() → Quaternion                 │
+│       │    └─► publish_event(Event::PoseUpdated)                    │
+│       │                                                              │
+│       ├──► AudioCapture::process()                                  │
+│       │    ├─► read_microphone_buffer()                             │
+│       │    ├─► apply_noise_reduction()                              │
+│       │    ├─► detect_voice_activity() → VAD result                 │
+│       │    └─► publish_event(Event::AudioReady)                     │
+│       │                                                              │
+│       ├──► PowerManager::monitor()                                  │
+│       │    ├─► read_battery_level() → 0.0-1.0                       │
+│       │    ├─► read_temperature() → Celsius                         │
+│       │    ├─► calculate_remaining_time()                           │
+│       │    ├─► check_thermal_throttle()                             │
+│       │    └─► publish_event(Event::PowerStateChanged)              │
+│       │                                                              │
+│       └──► DisplayManager::render(framebuffer)                      │
+│            ├─► composite_layers() → final_image                     │
+│            ├─► apply_color_correction()                             │
+│            ├─► send_to_waveguide_display()                          │
+│            └─► update_refresh_rate()                                │
+│                                                                      │
+│  Event Flow:                                                         │
+│  Hardware → Event Bus → [Subscribed Layers]                         │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 2: P2P Network Layer - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 2: P2P NETWORK                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │              P2PNetwork::tick()                             │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► PeerDiscovery::discover()                                │
+│       │    ├─► mDNS::broadcast("_karana._tcp")                      │
+│       │    ├─► listen_for_responses()                               │
+│       │    ├─► validate_peer_identity()                             │
+│       │    ├─► add_to_peer_table(peer_id, multiaddr)                │
+│       │    └─► publish_event(Event::PeerDiscovered)                 │
+│       │                                                              │
+│       ├──► ConnectionManager::maintain()                            │
+│       │    ├─► check_peer_health() → ping_timeout?                  │
+│       │    ├─► remove_stale_peers()                                 │
+│       │    ├─► dial_new_peers()                                     │
+│       │    └─► update_routing_table()                               │
+│       │                                                              │
+│       ├──► GossipSub::process_messages()                            │
+│       │    ├─► receive_from_network()                               │
+│       │    ├─► validate_message_signature()                         │
+│       │    ├─► check_duplicate() → seen_cache                       │
+│       │    ├─► route_to_subscribers(topic)                          │
+│       │    ├─► forward_to_peers() → propagation                     │
+│       │    └─► publish_event(Event::MessageReceived)                │
+│       │                                                              │
+│       ├──► BlockSync::sync()                                        │
+│       │    ├─► request_missing_blocks(peer_id, range)               │
+│       │    ├─► receive_block_response()                             │
+│       │    ├─► validate_block_signatures()                          │
+│       │    ├─► apply_to_local_chain()                               │
+│       │    └─► publish_event(Event::ChainSynced)                    │
+│       │                                                              │
+│       └──► MessageBroadcast::send(message)                          │
+│            ├─► serialize_message()                                  │
+│            ├─► sign_with_local_key()                                │
+│            ├─► select_peers(fanout=6)                               │
+│            ├─► send_via_gossipsub()                                 │
+│            └─► track_delivery_status()                              │
+│                                                                      │
+│  Protocols: libp2p + mDNS + Gossipsub + Kademlia DHT               │
+│  Security: Ed25519 signatures, encrypted channels                   │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 3: Blockchain Layer - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 3: BLOCKCHAIN                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │           Blockchain::produce_block()                       │    │
+│  │           (Every 30 seconds)                                │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► TxPool::collect_transactions()                           │
+│       │    ├─► get_pending_transactions()                           │
+│       │    ├─► sort_by_priority() → high_value_first                │
+│       │    ├─► validate_each_tx()                                   │
+│       │    │    ├─► verify_signature()                              │
+│       │    │    ├─► check_balance()                                 │
+│       │    │    └─► validate_nonce()                                │
+│       │    └─► select_top_N(max_block_size)                         │
+│       │                                                              │
+│       ├──► BlockBuilder::build()                                    │
+│       │    ├─► create_block_header()                                │
+│       │    │    ├─► prev_block_hash                                 │
+│       │    │    ├─► timestamp = now()                               │
+│       │    │    ├─► height = prev_height + 1                        │
+│       │    │    └─► merkle_root(transactions)                       │
+│       │    ├─► add_transactions(selected_txs)                       │
+│       │    ├─► calculate_state_root()                               │
+│       │    └─► return unsigned_block                                │
+│       │                                                              │
+│       ├──► Wallet::sign_block(block)                                │
+│       │    ├─► load_keypair()                                       │
+│       │    ├─► serialize_block()                                    │
+│       │    ├─► sign_with_ed25519()                                  │
+│       │    └─► attach_signature(block)                              │
+│       │                                                              │
+│       ├──► Chain::add_block(signed_block)                           │
+│       │    ├─► validate_block()                                     │
+│       │    │    ├─► verify_signature()                              │
+│       │    │    ├─► check_prev_hash()                               │
+│       │    │    ├─► validate_transactions()                         │
+│       │    │    └─► check_state_root()                              │
+│       │    ├─► apply_state_changes()                                │
+│       │    ├─► update_balances()                                    │
+│       │    ├─► persist_to_rocksdb()                                 │
+│       │    └─► publish_event(Event::BlockAdded)                     │
+│       │                                                              │
+│       ├──► CelestiaDA::submit(block)                                │
+│       │    ├─► encode_block_to_blob()                               │
+│       │    ├─► connect_to_mocha_testnet()                           │
+│       │    ├─► submit_blob_tx()                                     │
+│       │    ├─► wait_for_commitment()                                │
+│       │    └─► store_commitment_proof()                             │
+│       │                                                              │
+│       └──► P2PNetwork::broadcast(block)                             │
+│            └─► gossipsub.publish("blocks", block)                   │
+│                                                                      │
+│  Storage: RocksDB (karana-ledger/)                                  │
+│  Consensus: Single validator (dev), future: PoS                     │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 4: Oracle Bridge - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 4: ORACLE BRIDGE                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         OracleVeil::process_intent(intent)                  │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► IntentClassifier::classify()                             │
+│       │    ├─► parse_intent_type() → Transfer/Query/Action          │
+│       │    ├─► extract_parameters()                                 │
+│       │    ├─► validate_completeness()                              │
+│       │    └─► return classified_intent                             │
+│       │                                                              │
+│       ├──► ZKIntentProver::generate_proof()                         │
+│       │    ├─► create_intent_commitment()                           │
+│       │    ├─► generate_witness()                                   │
+│       │    ├─► prove_with_groth16()                                 │
+│       │    │    ├─► load_proving_key()                              │
+│       │    │    ├─► compute_proof()                                 │
+│       │    │    └─► serialize_proof()                               │
+│       │    └─► return zk_proof                                      │
+│       │                                                              │
+│       ├──► BlockchainInterface::execute()                           │
+│       │    ├─► create_transaction(intent)                           │
+│       │    │    ├─► encode_intent_to_tx_data()                      │
+│       │    │    ├─► set_gas_limit()                                 │
+│       │    │    └─► set_nonce()                                     │
+│       │    ├─► wallet.sign_transaction(tx)                          │
+│       │    ├─► chain.submit_transaction(signed_tx)                  │
+│       │    └─► wait_for_confirmation()                              │
+│       │                                                              │
+│       ├──► ManifestGenerator::create_ui()                           │
+│       │    ├─► determine_output_type(intent)                        │
+│       │    ├─► create_ar_overlays()                                 │
+│       │    │    ├─► spatial_position → WorldCoord                   │
+│       │    │    ├─► content → text/image                            │
+│       │    │    └─► interaction → gaze/gesture                      │
+│       │    ├─► create_haptic_pattern()                              │
+│       │    │    ├─► intensity → 0.0-1.0                             │
+│       │    │    ├─► duration → milliseconds                         │
+│       │    │    └─► rhythm → pattern_array                          │
+│       │    ├─► create_audio_feedback()                              │
+│       │    └─► return UIManifest                                    │
+│       │                                                              │
+│       └──► SenseOracle::query_external()                            │
+│            ├─► query_price_feed(symbol)                             │
+│            ├─► query_weather(location)                              │
+│            ├─► verify_sensor_data()                                 │
+│            └─► return oracle_response                               │
+│                                                                      │
+│  Bridge: AI decisions → Blockchain actions                          │
+│  Privacy: ZK proofs hide intent details on-chain                    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 5: Intelligence Layer - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 5: INTELLIGENCE                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         MultimodalFusion::fuse_inputs()                     │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► InputCollector::gather()                                 │
+│       │    ├─► get_voice_input() → audio_buffer                     │
+│       │    ├─► get_gaze_target() → (x, y, z)                        │
+│       │    ├─► get_gesture_state() → hand_pose                      │
+│       │    ├─► get_camera_frame() → image                           │
+│       │    └─► get_context() → location, time, history              │
+│       │                                                              │
+│       ├──► ModalityAligner::align()                                 │
+│       │    ├─► timestamp_sync() → align_to_same_moment              │
+│       │    ├─► spatial_transform() → common_coordinate_frame        │
+│       │    ├─► semantic_align() → match_referring_expressions       │
+│       │    └─► return aligned_inputs                                │
+│       │                                                              │
+│       ├──► SceneUnderstanding::analyze()                            │
+│       │    ├─► run_blip_model(image)                                │
+│       │    │    ├─► image_encoding()                                │
+│       │    │    ├─► vision_transformer()                            │
+│       │    │    └─► caption_generation()                            │
+│       │    ├─► detect_objects(image)                                │
+│       │    │    ├─► yolo_detection()                                │
+│       │    │    ├─► bounding_boxes()                                │
+│       │    │    └─► class_labels()                                  │
+│       │    ├─► semantic_segmentation()                              │
+│       │    ├─► spatial_relationships()                              │
+│       │    │    ├─► "cup on table"                                  │
+│       │    │    ├─► "person next to door"                           │
+│       │    │    └─► relative_positions()                            │
+│       │    └─► return scene_graph                                   │
+│       │                                                              │
+│       ├──► ContextMemory::retrieve()                                │
+│       │    ├─► query_recent_history(limit=10)                       │
+│       │    ├─► query_relevant_facts(embedding)                      │
+│       │    ├─► query_spatial_anchors(location)                      │
+│       │    └─► return context_state                                 │
+│       │                                                              │
+│       ├──► IntentPredictor::predict()                               │
+│       │    ├─► analyze_user_patterns()                              │
+│       │    ├─► check_time_of_day()                                  │
+│       │    ├─► check_location()                                     │
+│       │    ├─► predict_next_action()                                │
+│       │    │    ├─► "User usually checks time at 9am"               │
+│       │    │    ├─► "User at home → likely to relax"                │
+│       │    │    └─► confidence_score                                │
+│       │    └─► return predicted_intents                             │
+│       │                                                              │
+│       └──► FusionEngine::combine()                                  │
+│            ├─► weight_modalities() → voice=0.7, gaze=0.2, etc       │
+│            ├─► resolve_conflicts() → voice overrides gesture        │
+│            ├─► create_unified_intent()                              │
+│            └─► publish_event(Event::IntentFused)                    │
+│                                                                      │
+│  Models: BLIP (vision), MiniLM (embeddings), custom fusion          │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 6: AI Engine - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 6: AI ENGINE                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         NLUEngine::process_utterance(text)                  │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► IntentClassifier::classify()                             │
+│       │    ├─► tokenize_text()                                      │
+│       │    ├─► run_minilm_embedding()                               │
+│       │    ├─► cosine_similarity(embeddings, intent_patterns)       │
+│       │    ├─► select_top_intent(threshold=0.7)                     │
+│       │    │    ├─► SendMessage (confidence: 0.92)                  │
+│       │    │    ├─► MakePayment (confidence: 0.15)                  │
+│       │    │    └─► CheckBalance (confidence: 0.08)                 │
+│       │    └─► return Intent::SendMessage                           │
+│       │                                                              │
+│       ├──► EntityExtractor::extract()                               │
+│       │    ├─► regex_patterns() → phone, email, amounts             │
+│       │    ├─► named_entity_recognition()                           │
+│       │    │    ├─► PERSON: "Mom"                                   │
+│       │    │    ├─► NUMBER: "50"                                    │
+│       │    │    ├─► TIME: "tomorrow"                                │
+│       │    │    └─► LOCATION: "coffee shop"                         │
+│       │    ├─► resolve_references() → "Mom" → contact_id            │
+│       │    └─► return extracted_entities                            │
+│       │                                                              │
+│       ├──► DialogueManager::track_conversation()                    │
+│       │    ├─► update_dialogue_state()                              │
+│       │    │    ├─► current_topic = "payment"                       │
+│       │    │    ├─► turn_count = 3                                  │
+│       │    │    └─► last_utterance_time                             │
+│       │    ├─► manage_context_stack()                               │
+│       │    │    ├─► push_new_topic()                                │
+│       │    │    ├─► pop_completed_topic()                           │
+│       │    │    └─► maintain_history(max=10)                        │
+│       │    ├─► slot_filling()                                       │
+│       │    │    ├─► required: [recipient, amount]                   │
+│       │    │    ├─► filled: [recipient="Mom"]                       │
+│       │    │    ├─► missing: [amount]                               │
+│       │    │    └─► prompt_for_missing()                            │
+│       │    └─► return dialogue_state                                │
+│       │                                                              │
+│       ├──► ReasoningEngine::reason()                                │
+│       │    ├─► load_context(dialogue_state, scene, memory)          │
+│       │    ├─► check_feasibility()                                  │
+│       │    │    ├─► has_sufficient_balance?                         │
+│       │    │    ├─► recipient_valid?                                │
+│       │    │    ├─► amount_reasonable?                              │
+│       │    │    └─► return feasibility_check                        │
+│       │    ├─► predict_consequences()                               │
+│       │    ├─► suggest_alternatives()                               │
+│       │    └─► return reasoning_result                              │
+│       │                                                              │
+│       ├──► ActionExecutor::execute()                                │
+│       │    ├─► validate_action(intent, reasoning)                   │
+│       │    ├─► check_permissions()                                  │
+│       │    ├─► create_execution_plan()                              │
+│       │    │    ├─► Step 1: Get wallet balance                      │
+│       │    │    ├─► Step 2: Create transaction                      │
+│       │    │    ├─► Step 3: Sign with key                           │
+│       │    │    ├─► Step 4: Submit to chain                         │
+│       │    │    └─► Step 5: Wait confirmation                       │
+│       │    ├─► execute_steps()                                      │
+│       │    ├─► handle_errors() → retry/fallback                     │
+│       │    └─► return execution_result                              │
+│       │                                                              │
+│       └──► ResponseGenerator::generate()                            │
+│            ├─► select_response_template(intent)                     │
+│            ├─► fill_template_slots(entities)                        │
+│            ├─► personalize(user_preferences)                        │
+│            └─► return "Sent 50 KARA to Mom. Block #42,891"          │
+│                                                                      │
+│  Models: MiniLM-L6 (NLU), TinyLlama (dialogue), rule-based logic    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 7: Interface Layer - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 7: INTERFACE                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         VoiceCommandManager::process_audio()                │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► WakeWordDetector::detect()                               │
+│       │    ├─► run_porcupine("Hey Karana")                          │
+│       │    ├─► check_threshold(sensitivity=0.7)                     │
+│       │    ├─► if detected → set_listening_mode()                   │
+│       │    └─► publish_event(Event::WakeWordDetected)               │
+│       │                                                              │
+│       ├──► VAD::detect_voice()                                      │
+│       │    ├─► analyze_energy_levels()                              │
+│       │    ├─► check_spectral_features()                            │
+│       │    ├─► duration_check(min=300ms)                            │
+│       │    └─► return is_speech_present                             │
+│       │                                                              │
+│       ├──► WhisperSTT::transcribe()                                 │
+│       │    ├─► load_whisper_tiny_model()                            │
+│       │    ├─► preprocess_audio()                                   │
+│       │    │    ├─► resample_to_16khz()                             │
+│       │    │    ├─► normalize_volume()                              │
+│       │    │    └─► mel_spectrogram()                               │
+│       │    ├─► run_inference()                                      │
+│       │    ├─► decode_tokens_to_text()                              │
+│       │    └─► return transcript                                    │
+│       │                                                              │
+│       ├──► GestureRecognizer::track_hands()                         │
+│       │    ├─► detect_hands_in_frame(camera)                        │
+│       │    ├─► mediapipe_hand_tracking()                            │
+│       │    │    ├─► 21 landmarks per hand                           │
+│       │    │    ├─► 3D positions + confidence                       │
+│       │    │    └─► hand_edness(left/right)                         │
+│       │    ├─► classify_gesture()                                   │
+│       │    │    ├─► pinch: thumb+index < 2cm                        │
+│       │    │    ├─► grab: all_fingers_closed                        │
+│       │    │    ├─► swipe: hand_velocity > threshold                │
+│       │    │    └─► point: index_extended, others_closed            │
+│       │    └─► publish_event(Event::GestureDetected)                │
+│       │                                                              │
+│       ├──► GazeTracker::track_eyes()                                │
+│       │    ├─► detect_eyes_in_frame()                               │
+│       │    ├─► estimate_gaze_direction()                            │
+│       │    │    ├─► pupil_center()                                  │
+│       │    │    ├─► eye_corner_landmarks()                          │
+│       │    │    └─► calculate_gaze_vector()                         │
+│       │    ├─► project_to_display_space()                           │
+│       │    ├─► detect_fixation(dwell_time > 500ms)                  │
+│       │    └─► publish_event(Event::GazeUpdated)                    │
+│       │                                                              │
+│       ├──► HUDManager::render()                                     │
+│       │    ├─► collect_render_data()                                │
+│       │    │    ├─► notifications_queue                             │
+│       │    │    ├─► active_widgets                                  │
+│       │    │    ├─► ar_overlays                                     │
+│       │    │    └─► system_indicators                               │
+│       │    ├─► layout_elements()                                    │
+│       │    │    ├─► position_in_viewport()                          │
+│       │    │    ├─► z_order_sorting()                               │
+│       │    │    └─► occlusion_handling()                            │
+│       │    ├─► composite_layers()                                   │
+│       │    ├─► apply_transparency()                                 │
+│       │    └─► send_to_display(framebuffer)                         │
+│       │                                                              │
+│       └──► ARRenderer::render_scene()                               │
+│            ├─► load_spatial_anchors()                               │
+│            ├─► transform_to_camera_space(pose)                      │
+│            ├─► render_ar_tabs()                                     │
+│            │    ├─► for each tab:                                   │
+│            │    ├─► calculate_billboard_matrix()                    │
+│            │    ├─► render_content(tab.texture)                     │
+│            │    └─► apply_lighting()                                │
+│            ├─► render_virtual_objects()                             │
+│            └─► blend_with_passthrough(camera)                       │
+│                                                                      │
+│  Input: Voice, Gestures, Gaze  │  Output: HUD, AR, Haptics         │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 8: Applications Layer - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 8: APPLICATIONS                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         ApplicationManager::dispatch_intent()               │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► TimerManager::handle()                                   │
+│       │    ├─► parse_duration("5 minutes")                          │
+│       │    ├─► create_timer(id, duration, callback)                 │
+│       │    ├─► start_countdown()                                    │
+│       │    ├─► tick() → update_remaining_time()                     │
+│       │    ├─► on_complete() → trigger_alert()                      │
+│       │    └─► publish_event(Event::TimerFinished)                  │
+│       │                                                              │
+│       ├──► NavigationEngine::route()                                │
+│       │    ├─► resolve_destination("coffee shop")                   │
+│       │    ├─► query_location_db()                                  │
+│       │    ├─► calculate_route(current_pos, dest)                   │
+│       │    │    ├─► fetch_map_data()                                │
+│       │    │    ├─► pathfinding_algorithm(A*)                       │
+│       │    │    ├─► consider_traffic()                              │
+│       │    │    └─► optimize_for_walking()                          │
+│       │    ├─► generate_turn_instructions()                         │
+│       │    ├─► create_ar_waypoints()                                │
+│       │    │    ├─► place_arrow_at(next_turn)                       │
+│       │    │    ├─► distance_indicator()                            │
+│       │    │    └─► eta_display()                                   │
+│       │    └─► return navigation_session                            │
+│       │                                                              │
+│       ├──► NotificationManager::display()                           │
+│       │    ├─► receive_notification(source, message)                │
+│       │    ├─► classify_priority()                                  │
+│       │    │    ├─► Critical: Show immediately                      │
+│       │    │    ├─► High: Queue with sound                          │
+│       │    │    ├─► Normal: Queue silently                          │
+│       │    │    └─► Low: Batch for later                            │
+│       │    ├─► apply_whisper_mode()                                 │
+│       │    │    ├─► if privacy_zone == Public:                      │
+│       │    │    ├─► hide_sensitive_content                          │
+│       │    │    └─► reduce_sound                                    │
+│       │    ├─► render_in_hud(position, duration)                    │
+│       │    ├─► trigger_haptic(pattern)                              │
+│       │    └─► log_to_history()                                     │
+│       │                                                              │
+│       ├──► SocialManager::contacts()                                │
+│       │    ├─► load_contact_db()                                    │
+│       │    ├─► search_by_name(query)                                │
+│       │    ├─► frequency_sort() → most_contacted_first              │
+│       │    ├─► resolve_wallet_address(contact)                      │
+│       │    └─► return contact_list                                  │
+│       │                                                              │
+│       ├──► WellnessManager::monitor()                               │
+│       │    ├─► track_screen_time()                                  │
+│       │    ├─► detect_eye_strain()                                  │
+│       │    │    ├─► blink_rate_analysis()                           │
+│       │    │    ├─► viewing_distance_check()                        │
+│       │    │    └─► suggest_break(every_20min)                      │
+│       │    ├─► posture_tracking()                                   │
+│       │    │    ├─► neck_angle_analysis()                           │
+│       │    │    ├─► detect_slouching()                              │
+│       │    │    └─► vibrate_reminder()                              │
+│       │    └─► usage_analytics()                                    │
+│       │                                                              │
+│       └──► SettingsManager::configure()                             │
+│            ├─► load_config_hierarchy()                              │
+│            ├─► apply_user_preferences()                             │
+│            ├─► validate_changes()                                   │
+│            ├─► persist_to_storage()                                 │
+│            └─► notify_affected_components()                         │
+│                                                                      │
+│  App Lifecycle: Created → Started → Running → Paused → Stopped     │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer 9: System Services - Internal Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    LAYER 9: SYSTEM SERVICES                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌────────────────────────────────────────────────────────────┐    │
+│  │         SystemServices::monitor_and_maintain()              │    │
+│  └────┬───────────────────────────────────────────────────────┘    │
+│       │                                                              │
+│       ├──► DiagnosticsManager::health_check()                       │
+│       │    ├─► collect_system_metrics()                             │
+│       │    │    ├─► cpu_usage → top_cmd()                           │
+│       │    │    ├─► memory_usage → /proc/meminfo                    │
+│       │    │    ├─► disk_usage → df_cmd()                           │
+│       │    │    ├─► network_stats → netstat                         │
+│       │    │    └─► battery_health → power_manager                  │
+│       │    ├─► run_health_checks()                                  │
+│       │    │    ├─► check_all_layers_responsive()                   │
+│       │    │    ├─► verify_model_loaded()                           │
+│       │    │    ├─► test_network_connectivity()                     │
+│       │    │    └─► validate_blockchain_sync()                      │
+│       │    ├─► generate_report()                                    │
+│       │    ├─► trigger_alerts(if_unhealthy)                         │
+│       │    └─► publish_event(Event::HealthReport)                   │
+│       │                                                              │
+│       ├──► RecoveryManager::handle_crash()                          │
+│       │    ├─► detect_crash_signal(SIGSEGV/SIGABRT)                 │
+│       │    ├─► capture_crash_dump()                                 │
+│       │    │    ├─► stack_trace()                                   │
+│       │    │    ├─► register_state()                                │
+│       │    │    ├─► memory_dump()                                   │
+│       │    │    └─► save_to_disk("/var/crash/")                     │
+│       │    ├─► identify_failed_component()                          │
+│       │    ├─► attempt_recovery_strategy()                          │
+│       │    │    ├─► Strategy 1: Restart component                   │
+│       │    │    ├─► Strategy 2: Reset to defaults                   │
+│       │    │    ├─► Strategy 3: Fall back to minimal                │
+│       │    │    └─► Strategy 4: Full system reboot                  │
+│       │    ├─► restore_user_session()                               │
+│       │    └─► log_incident()                                       │
+│       │                                                              │
+│       ├──► OTAManager::update()                                     │
+│       │    ├─► check_for_updates()                                  │
+│       │    │    ├─► query_update_server()                           │
+│       │    │    ├─► compare_versions(current, available)            │
+│       │    │    └─► verify_signature(manifest)                      │
+│       │    ├─► download_update_package()                            │
+│       │    │    ├─► download_chunks(resume_capable)                 │
+│       │    │    ├─► verify_checksums()                              │
+│       │    │    └─► validate_package_integrity()                    │
+│       │    ├─► prepare_installation()                               │
+│       │    │    ├─► backup_current_version()                        │
+│       │    │    ├─► allocate_staging_partition()                    │
+│       │    │    └─► create_rollback_point()                         │
+│       │    ├─► install_atomically()                                 │
+│       │    │    ├─► write_to_staging()                              │
+│       │    │    ├─► verify_installation()                           │
+│       │    │    ├─► update_boot_flags()                             │
+│       │    │    └─► reboot_to_new_version()                         │
+│       │    └─► verify_boot_success()                                │
+│       │        ├─► if success: commit_update()                      │
+│       │        └─► if fail: rollback_to_previous()                  │
+│       │                                                              │
+│       └──► SecurityManager::enforce()                               │
+│            ├─► authenticate_user()                                  │
+│            │    ├─► capture_biometric(iris/voice/face)              │
+│            │    ├─► compare_with_stored_template()                  │
+│            │    ├─► multi_factor_check()                            │
+│            │    └─► return auth_token                               │
+│            ├─► check_permissions(resource, action)                  │
+│            │    ├─► load_acl(access_control_list)                   │
+│            │    ├─► verify_user_role()                              │
+│            │    ├─► check_resource_owner()                          │
+│            │    └─► return allow/deny                               │
+│            ├─► encrypt_data(data, key)                              │
+│            │    ├─► aes_256_gcm_encrypt()                           │
+│            │    ├─► generate_iv()                                   │
+│            │    └─► return ciphertext                               │
+│            └─► secure_storage_access()                              │
+│                ├─► unlock_encrypted_storage()                       │
+│                ├─► validate_access_patterns()                       │
+│                └─► log_security_event()                             │
+│                                                                      │
+│  Watchdog: Monitors all layers, auto-restarts if hung              │
+│  Profiler: Performance analysis, bottleneck detection              │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Core Architectural Patterns
 
 ### 1. Monad Pattern - Central Orchestrator
@@ -1075,6 +1853,431 @@ app_manager.register("my_app", Box::new(MyApp::new()))?;
 
 // 3. Voice command to launch
 "open my app" → Intent::OpenApp { app: "my_app" }
+```
+
+---
+
+## Cross-Cutting Systems Flow Diagrams
+
+### Event Bus - Message Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    EVENT BUS (Cross-Cutting)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Publisher (Any Layer)                                               │
+│       │                                                              │
+│       ├─► Event::create()                                            │
+│       │    ├─► id: Uuid::new()                                       │
+│       │    ├─► timestamp: SystemTime::now()                          │
+│       │    ├─► source: LayerId                                       │
+│       │    ├─► category: EventCategory                               │
+│       │    ├─► priority: EventPriority                               │
+│       │    └─► payload: EventPayload                                 │
+│       │                                                              │
+│       ├─► EventBus::publish(event)                                   │
+│       │    ├─► validate_event()                                      │
+│       │    ├─► add_to_history(event)                                 │
+│       │    ├─► EventRouter::route(event)                             │
+│       │    │    ├─► match_rules(category, priority)                  │
+│       │    │    ├─► select_subscribers(policy)                       │
+│       │    │    │    ├─► All: Send to everyone                       │
+│       │    │    │    ├─► First: Send to first available             │
+│       │    │    │    ├─► RoundRobin: Rotate through list            │
+│       │    │    │    ├─► CapabilityBased: Match capabilities        │
+│       │    │    │    └─► return subscriber_list                      │
+│       │    │    └─► return routing_decision                          │
+│       │    └─► async_deliver_to_subscribers()                        │
+│       │                                                              │
+│       ▼                                                              │
+│  Subscriber Channels (tokio::mpsc)                                   │
+│       │                                                              │
+│       ├─► Layer 1 Channel → Event { Hardware }                       │
+│       ├─► Layer 2 Channel → Event { Network }                        │
+│       ├─► Layer 3 Channel → Event { Blockchain }                     │
+│       ├─► Layer 4 Channel → Event { Oracle }                         │
+│       ├─► Layer 5 Channel → Event { Intelligence }                   │
+│       ├─► Layer 6 Channel → Event { AI }                             │
+│       ├─► Layer 7 Channel → Event { Interface }                      │
+│       ├─► Layer 8 Channel → Event { Application }                    │
+│       └─► Layer 9 Channel → Event { System }                         │
+│                                                                      │
+│  Subscriber (Any Layer)                                              │
+│       │                                                              │
+│       ├─► receive_event(event)                                       │
+│       ├─► match event.category:                                      │
+│       │    ├─► Hardware: process_hardware_event()                    │
+│       │    ├─► Network: process_network_event()                      │
+│       │    ├─► AI: process_ai_event()                                │
+│       │    └─► ...                                                   │
+│       └─► handle_event()                                             │
+│                                                                      │
+│  Event History (VecDeque<Event>)                                     │
+│  ├─► Store last 1000 events                                          │
+│  ├─► Enable replay for debugging                                     │
+│  └─► Query by category/time                                          │
+│                                                                      │
+│  Priorities:                                                         │
+│  Critical → Process immediately (< 1ms)                              │
+│  High → Process within 100ms                                         │
+│  Normal → Process within 1s                                          │
+│  Low → Process when idle                                             │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Resource Coordinator - Adaptive Management
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              RESOURCE COORDINATOR (Cross-Cutting)                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Monitoring Loop (every 1 second)                                    │
+│       │                                                              │
+│       ├─► ResourceMonitor::take_snapshot()                           │
+│       │    ├─► read_cpu_usage() → 0.0-1.0                            │
+│       │    ├─► read_memory_usage() → bytes                           │
+│       │    ├─► read_battery_level() → 0.0-1.0                        │
+│       │    ├─► read_temperature() → Celsius                          │
+│       │    ├─► calculate_resource_level()                            │
+│       │    │    ├─► if battery > 60% && temp < 60° → Abundant       │
+│       │    │    ├─► if battery 30-60% → Normal                       │
+│       │    │    ├─► if battery 15-30% → Limited                      │
+│       │    │    └─► if battery < 15% → Critical                      │
+│       │    └─► store_in_history(snapshot)                            │
+│       │                                                              │
+│       ├─► ResourcePredictor::forecast()                              │
+│       │    ├─► analyze_trends(history_300_samples)                   │
+│       │    ├─► linear_regression(battery_drain)                      │
+│       │    ├─► predict_5_minutes_ahead()                             │
+│       │    │    ├─► expected_battery: 12%                            │
+│       │    │    ├─► expected_temp: 78°C                              │
+│       │    │    └─► confidence: 0.85                                 │
+│       │    └─► recommend_actions()                                   │
+│       │                                                              │
+│       ├─► AdaptiveLedger::adjust_mode()                              │
+│       │    ├─► classify_current_intent(intent_type)                  │
+│       │    │    ├─► HighValue: Payment, critical ops                 │
+│       │    │    └─► LowValue: Logging, analytics                     │
+│       │    ├─► determine_mode(resource_level)                        │
+│       │    │    ├─► Abundant/Normal → Full Mode                      │
+│       │    │    ├─► Limited → Light Mode                             │
+│       │    │    └─► Critical → Minimal Mode                          │
+│       │    ├─► switch_mode_if_changed()                              │
+│       │    │    ├─► Full: Store all blocks + validation              │
+│       │    │    ├─► Light: Headers + summaries only                  │
+│       │    │    └─► Minimal: Current state only                      │
+│       │    ├─► prune_old_data(if light_mode)                         │
+│       │    └─► checkpoint_state()                                    │
+│       │                                                              │
+│       ├─► AIProfileManager::adjust_profile()                         │
+│       │    ├─► check_active_models()                                 │
+│       │    ├─► determine_profile(resource_level)                     │
+│       │    │    ├─► Abundant → Advanced                              │
+│       │    │    ├─► Normal → Standard                                │
+│       │    │    ├─► Limited → Basic                                  │
+│       │    │    └─► Critical → UltraLow                              │
+│       │    ├─► switch_profile()                                      │
+│       │    │    ├─► Advanced: All models loaded                      │
+│       │    │    ├─► Standard: Essential models                       │
+│       │    │    ├─► Basic: Text + simple vision                      │
+│       │    │    └─► UltraLow: Text only                              │
+│       │    ├─► unload_unused_models()                                │
+│       │    └─► schedule_high_priority_tasks()                        │
+│       │                                                              │
+│       └─► publish_event(Event::ResourceStateChanged)                 │
+│            ├─► current_level: Limited                                │
+│            ├─► ledger_mode: Light                                    │
+│            ├─► ai_profile: Basic                                     │
+│            └─► forecast: Critical in 3 min                           │
+│                                                                      │
+│  Feedback Loop:                                                      │
+│  Layers subscribe → Adjust behavior → Report usage →                │
+│  Monitor observes → Predicts → Adjusts → Layers react               │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Privacy Manager - Data Control Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              PRIVACY MANAGER (Cross-Cutting)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Context Detection (continuous)                                      │
+│       │                                                              │
+│       ├─► detect_privacy_zone()                                      │
+│       │    ├─► get_current_location() → GPS                          │
+│       │    ├─► check_geofence(home, work, saved_locations)          │
+│       │    ├─► classify_zone()                                       │
+│       │    │    ├─► Home: Relaxed policies                           │
+│       │    │    ├─► Work: Moderate policies                          │
+│       │    │    ├─► Public: Strict policies                          │
+│       │    │    ├─► Travel: Enhanced tracking protection            │
+│       │    │    └─► Shopping: Minimal data collection               │
+│       │    └─► auto_adjust_mode(zone)                                │
+│       │                                                              │
+│       ├─► DataRetentionManager::apply_policies()                     │
+│       │    ├─► for each DataCategory:                                │
+│       │    │    ├─► Messages: max_age=30d, max_count=1000           │
+│       │    │    ├─► MediaFiles: max_age=90d                          │
+│       │    │    ├─► Browsing: max_age=7d                             │
+│       │    │    ├─► Location: max_age=24h                            │
+│       │    │    ├─► Contacts: protected (no deletion)                │
+│       │    │    ├─► Calendar: protected                              │
+│       │    │    ├─► Health: max_age=30d                              │
+│       │    │    └─► Transactions: protected                          │
+│       │    ├─► load_category_items()                                 │
+│       │    ├─► apply_age_filter()                                    │
+│       │    ├─► apply_count_limit()                                   │
+│       │    ├─► delete_expired_items()                                │
+│       │    └─► log_cleanup_stats()                                   │
+│       │                                                              │
+│       ├─► EphemeralModeManager::handle_session()                     │
+│       │    ├─► if privacy_zone == Public:                            │
+│       │    │    ├─► auto_start_session()                             │
+│       │    │    ├─► tag_all_new_data_ephemeral()                     │
+│       │    │    └─► show_indicator("Ephemeral Mode Active")          │
+│       │    ├─► track_session_data()                                  │
+│       │    │    ├─► photos_taken → marked_for_deletion               │
+│       │    │    ├─► messages_sent → marked_for_deletion              │
+│       │    │    └─► browsing_history → marked_for_deletion           │
+│       │    └─► on_zone_change(zone):                                 │
+│       │        ├─► if leaving_public:                                │
+│       │        │    ├─► delete_all_session_data()                    │
+│       │        │    ├─► clear_cache()                                │
+│       │        │    └─► zero_trace_cleanup()                         │
+│       │        └─► show_confirmation("Data cleared")                 │
+│       │                                                              │
+│       ├─► PermissionTracker::monitor()                               │
+│       │    ├─► on_permission_requested(app, permission):             │
+│       │    │    ├─► check_privacy_zone()                             │
+│       │    │    ├─► if Public: require_confirmation()                │
+│       │    │    ├─► if Home: check_remembered_permissions()          │
+│       │    │    ├─► log_usage(app, permission, timestamp)            │
+│       │    │    └─► show_indicator(permission_type)                  │
+│       │    ├─► track_active_permissions()                            │
+│       │    │    ├─► Camera: green_dot_in_hud()                       │
+│       │    │    ├─► Microphone: red_dot_in_hud()                     │
+│       │    │    ├─► Location: blue_dot_in_hud()                      │
+│       │    │    └─► Multiple: combined_indicator()                   │
+│       │    └─► generate_daily_report()                               │
+│       │        ├─► total_uses_per_permission                         │
+│       │        ├─► apps_by_usage                                     │
+│       │        ├─► hourly_patterns                                   │
+│       │        └─► suspicious_activity_detection                     │
+│       │                                                              │
+│       └─► publish_event(Event::PrivacyStateChanged)                  │
+│            ├─► current_zone: Public                                  │
+│            ├─► ephemeral_mode: Active                                │
+│            ├─► active_permissions: [Camera, Location]                │
+│            └─► retention_policy: Strict                              │
+│                                                                      │
+│  User Control:                                                       │
+│  - View all collected data                                           │
+│  - Manually delete categories                                        │
+│  - Export privacy reports                                            │
+│  - Configure zone boundaries                                         │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Resilience Coordinator - Fault Management
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│            RESILIENCE COORDINATOR (Cross-Cutting)                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Health Monitoring Loop (every 5 seconds)                            │
+│       │                                                              │
+│       ├─► HealthMonitor::check_all_layers()                          │
+│       │    ├─► for each LayerId:                                     │
+│       │    │    ├─► ping_layer() → response_time                     │
+│       │    │    ├─► check_responsiveness(timeout=1s)                 │
+│       │    │    ├─► validate_functionality()                         │
+│       │    │    ├─► classify_health()                                │
+│       │    │    │    ├─► Healthy: All checks passed                  │
+│       │    │    │    ├─► Degraded: Slow but working                  │
+│       │    │    │    ├─► Unhealthy: Failures detected                │
+│       │    │    │    └─► Unknown: No response                        │
+│       │    │    └─► update_layer_status(layer, health)               │
+│       │    └─► store_health_history()                                │
+│       │                                                              │
+│       ├─► CircuitBreaker::manage_per_layer()                         │
+│       │    ├─► for each layer with circuit_breaker:                  │
+│       │    │    ├─► check_failure_count()                            │
+│       │    │    ├─► if failures >= threshold:                        │
+│       │    │    │    ├─► open_circuit()                              │
+│       │    │    │    ├─► block_requests_to_layer()                   │
+│       │    │    │    ├─► start_timeout_timer(30s)                    │
+│       │    │    │    └─► publish_event(CircuitOpened)                │
+│       │    │    ├─► if circuit_open && timeout_elapsed:              │
+│       │    │    │    ├─► enter_half_open_state()                     │
+│       │    │    │    ├─► allow_test_request()                        │
+│       │    │    │    └─► if success: close_circuit()                 │
+│       │    │    └─► if success_count >= threshold:                   │
+│       │    │         ├─► close_circuit()                             │
+│       │    │         ├─► reset_failure_count()                       │
+│       │    │         └─► publish_event(CircuitClosed)                │
+│       │    └─► update_circuit_states()                               │
+│       │                                                              │
+│       ├─► MinimalModeManager::check_activation()                     │
+│       │    ├─► check_triggers()                                      │
+│       │    │    ├─► battery_level < 10%?                             │
+│       │    │    ├─► temperature > 85°C?                              │
+│       │    │    ├─► memory_available < 50MB?                         │
+│       │    │    ├─► critical_error_detected?                         │
+│       │    │    └─► network_total_failure?                           │
+│       │    ├─► if should_activate():                                 │
+│       │    │    ├─► stop_all_non_essential_services()                │
+│       │    │    │    ├─► stop AI engine                              │
+│       │    │    │    ├─► stop blockchain sync                        │
+│       │    │    │    ├─► stop applications                           │
+│       │    │    │    └─► stop distributed compute                    │
+│       │    │    ├─► keep_essential_only()                            │
+│       │    │    │    ├─► keep HUD (basic display)                    │
+│       │    │    │    ├─► keep Voice (commands)                       │
+│       │    │    │    └─► keep Wallet (emergency payments)            │
+│       │    │    ├─► reduce_resource_usage()                          │
+│       │    │    │    ├─► target: <10MB memory                        │
+│       │    │    │    └─► target: <5% CPU                             │
+│       │    │    ├─► show_minimal_mode_notice()                       │
+│       │    │    └─► publish_event(MinimalModeActivated)              │
+│       │    └─► monitor_for_recovery()                                │
+│       │                                                              │
+│       ├─► FeatureGateManager::enforce()                              │
+│       │    ├─► for each Feature:                                     │
+│       │    │    ├─► check_state(feature)                             │
+│       │    │    ├─► if Emergency: block_completely()                 │
+│       │    │    ├─► if Disabled: skip_execution()                    │
+│       │    │    ├─► if Enabled: allow_execution()                    │
+│       │    │    └─► check_dependencies()                             │
+│       │    │         ├─► if ARTabs depends on ARRendering            │
+│       │    │         └─► if ARRendering disabled → disable ARTabs    │
+│       │    └─► apply_feature_state()                                 │
+│       │                                                              │
+│       └─► publish_event(Event::ResilienceStatus)                     │
+│            ├─► layer_health: HashMap<LayerId, HealthStatus>          │
+│            ├─► circuit_states: HashMap<LayerId, CircuitState>        │
+│            ├─► minimal_mode: Active/Inactive                         │
+│            └─► feature_gates: HashMap<Feature, FeatureState>         │
+│                                                                      │
+│  Recovery Strategies:                                                │
+│  1. Restart failed component                                         │
+│  2. Reset component to defaults                                      │
+│  3. Fall back to minimal mode                                        │
+│  4. Full system reboot (last resort)                                 │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Distributed Coordinator - Multi-Node Inference
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│          DISTRIBUTED COORDINATOR (Cross-Cutting)                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Inference Request Flow                                              │
+│       │                                                              │
+│       ├─► receive_inference_request(model, input, params)            │
+│       │    ├─► check_local_capability()                              │
+│       │    ├─► if can_run_locally():                                 │
+│       │    │    └─► run_local_inference() → fast_path                │
+│       │    └─► else: continue_to_distribution                        │
+│       │                                                              │
+│       ├─► ComputeNodeProtocol::discover_nodes()                      │
+│       │    ├─► broadcast_mDNS("Kāraṇa compute")                      │
+│       │    ├─► receive_peer_responses()                              │
+│       │    ├─► for each discovered_peer:                             │
+│       │    │    ├─► query_capabilities(peer)                         │
+│       │    │    │    ├─► cpu_cores, cpu_freq                         │
+│       │    │    │    ├─► gpu_memory, ram                             │
+│       │    │    │    ├─► acceleration: CUDA/Metal/ROCm/TPU           │
+│       │    │    │    └─► current_load                                │
+│       │    │    ├─► measure_latency(peer) → ping_time                │
+│       │    │    ├─► validate_trust(peer) → signature_check           │
+│       │    │    └─► add_to_registry(peer, capabilities)              │
+│       │    └─► return available_nodes                                │
+│       │                                                              │
+│       ├─► ModelPartitioner::partition()                              │
+│       │    ├─► load_model_info(model_name)                           │
+│       │    │    ├─► total_layers: 64                                 │
+│       │    │    ├─► total_params: 70B                                │
+│       │    │    ├─► memory_per_layer: 1.2GB                          │
+│       │    │    └─► compute_per_layer: 5 TFLOPs                      │
+│       │    ├─► select_strategy(available_nodes, model)               │
+│       │    │    ├─► if 4+ nodes: LayerWise (sequential)              │
+│       │    │    ├─► if 2 powerful nodes: TensorParallel              │
+│       │    │    ├─► if 3+ nodes: Pipeline                            │
+│       │    │    └─► if mixed: Hybrid                                 │
+│       │    ├─► partition_model(strategy, num_nodes)                  │
+│       │    │    ├─► LayerWise:                                       │
+│       │    │    │    ├─► Node 1: Layers 0-15                         │
+│       │    │    │    ├─► Node 2: Layers 16-31                        │
+│       │    │    │    ├─► Node 3: Layers 32-47                        │
+│       │    │    │    └─► Node 4: Layers 48-63                        │
+│       │    │    ├─► calculate_memory_requirements()                  │
+│       │    │    ├─► estimate_coordination_overhead()                 │
+│       │    │    └─► return PartitionedModel                          │
+│       │    └─► validate_partitions()                                 │
+│       │                                                              │
+│       ├─► EdgeCloudPool::allocate_nodes()                            │
+│       │    ├─► check_pool_capacity(requirements)                     │
+│       │    ├─► select_nodes(strategy)                                │
+│       │    │    ├─► LeastLoaded: Pick least busy                     │
+│       │    │    ├─► LowestLatency: Pick fastest                      │
+│       │    │    ├─► MostCapable: Pick most powerful                  │
+│       │    │    ├─► RoundRobin: Rotate through pool                  │
+│       │    │    └─► return selected_nodes                            │
+│       │    ├─► reserve_resources(nodes, requirements)                │
+│       │    ├─► if insufficient_capacity && auto_scale:               │
+│       │    │    ├─► discover_additional_nodes()                      │
+│       │    │    └─► add_to_pool()                                    │
+│       │    └─► return allocated_nodes                                │
+│       │                                                              │
+│       ├─► DistributedInference::coordinate_execution()               │
+│       │    ├─► assign_partitions_to_nodes()                          │
+│       │    ├─► transfer_model_weights(if_not_cached)                 │
+│       │    ├─► execute_strategy():                                   │
+│       │    │    ├─► LayerWise (Sequential):                          │
+│       │    │    │    ├─► Node1.run(input) → output1                  │
+│       │    │    │    ├─► transfer(output1 → Node2)                   │
+│       │    │    │    ├─► Node2.run(output1) → output2                │
+│       │    │    │    ├─► transfer(output2 → Node3)                   │
+│       │    │    │    ├─► Node3.run(output2) → output3                │
+│       │    │    │    ├─► transfer(output3 → Node4)                   │
+│       │    │    │    └─► Node4.run(output3) → final_output           │
+│       │    │    ├─► TensorParallel (Parallel):                       │
+│       │    │    │    ├─► broadcast(input → all_nodes)                │
+│       │    │    │    ├─► Node1.run(left_half) & Node2.run(right)     │
+│       │    │    │    ├─► gather_results()                            │
+│       │    │    │    └─► combine_tensors() → final_output            │
+│       │    │    └─► Pipeline:                                        │
+│       │    │         ├─► Stage1(batch1) → Stage2(batch2)             │
+│       │    │         └─► overlapped_execution()                      │
+│       │    ├─► collect_outputs()                                     │
+│       │    ├─► measure_metrics()                                     │
+│       │    │    ├─► total_latency: 120ms                             │
+│       │    │    ├─► tokens_per_second: 95                            │
+│       │    │    ├─► coordination_overhead: 15ms                      │
+│       │    │    └─► nodes_used: 4                                    │
+│       │    └─► return InferenceResponse                              │
+│       │                                                              │
+│       └─► release_resources(allocated_nodes)                         │
+│            ├─► mark_nodes_available()                                │
+│            ├─► update_pool_statistics()                              │
+│            └─► publish_event(InferenceCompleted)                     │
+│                                                                      │
+│  Security: Only model computations distributed, not user data        │
+│  Privacy: Input/output stay on local device                          │
+│  Efficiency: Automatic node selection based on capabilities          │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
