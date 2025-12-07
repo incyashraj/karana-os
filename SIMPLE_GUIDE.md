@@ -503,6 +503,52 @@ A: Privacy zones use geo-fencing. You set locations for Home, Work, etc. When th
 **Q: What happens in "Minimal Mode"?**
 A: When battery hits 10% or temperature exceeds 85°C, the system automatically enters ultra-low-power mode: only HUD, voice, and wallet work. Everything else pauses. This lets you make emergency payments or navigate home even on 2% battery.
 
+**Q: What are "build profiles"?**
+A: Four pre-configured system modes that balance features vs. memory:
+- **Minimal** (256MB): Essentials only - HUD, voice, wallet
+- **Standard** (512MB): Recommended - adds camera, AR, basic AI
+- **Full** (1024MB): Everything - blockchain, advanced AI, all sensors
+- **Development** (2048MB): For developers - includes debugging tools
+
+Your glasses automatically pick the right profile based on available memory.
+
+**Q: How does model quantization work?**
+A: It compresses AI models by reducing precision:
+- **FP32** (Full) → 100% accuracy, 4GB size
+- **INT8** (Standard) → 99% accuracy, 1GB size (4x smaller, 4x faster)
+- **INT4** (Minimal) → 97% accuracy, 500MB size (8x smaller, 8x faster)
+
+The system picks the best tradeoff for your task. Text generation uses INT4, vision uses INT8.
+
+**Q: What's the Intent API for?**
+A: Lets external apps integrate with Kāraṇa without full SDK:
+```
+Your App → Intent API → Kāraṇa OS
+"Capture photo" → Returns: photo_data.jpg
+"Display AR at (x,y,z)" → Shows: Your AR content
+"Send 10 KARA" → Executes: Blockchain transaction
+```
+Think of it like Siri Shortcuts, but for smart glasses.
+
+**Q: How does the companion protocol work?**
+A: Syncs data across your devices:
+1. Pair devices with 6-digit code
+2. Clipboard syncs automatically
+3. Notifications appear on all devices
+4. Files transfer seamlessly
+5. Session handoff (start on glasses, continue on phone)
+
+No cloud needed - devices talk directly via encrypted P2P.
+
+**Q: What's chaos engineering?**
+A: Intentionally breaking things to test resilience:
+- Camera failure → Falls back to voice-only
+- Network partition → Queues transactions for later
+- Memory exhaustion → Downgrade to Minimal profile
+- Thermal emergency → Offload compute to phone
+
+The system tests these scenarios automatically so real failures don't surprise it.
+
 ---
 
 ## The Bottom Line
@@ -515,15 +561,17 @@ Your glasses. Your data. Your rules.
 
 | Metric | Value |
 |--------|-------|
-| **Lines of Code** | 180,000+ |
-| **Automated Tests** | 2,225+ |
-| **Modules** | 50+ |
+| **Lines of Code** | 186,000+ |
+| **Automated Tests** | 2,295+ |
+| **Modules** | 65+ |
 | **Gesture Types** | 15+ |
 | **Native Apps** | 15 (YouTube, WhatsApp, etc.) |
+| **Build Profiles** | 4 (256MB-2GB) |
 | **Language** | Rust (safe, fast) |
 
 ### Key Features Summary
 
+**Core Features (Phases 1-52)**
 - 🗣️ **Voice AI** - Natural language understanding with context
 - 👐 **Hand Tracking** - Full 3D finger and gesture recognition
 - 👁️ **Gaze Control** - Eye tracking with dwell selection
@@ -537,6 +585,20 @@ Your glasses. Your data. Your rules.
 - 🔋 **Smart Power** - Adaptive resource management
 - 🔒 **Privacy Control** - Auto-delete, ephemeral mode, permission tracking
 - 🌐 **Distributed AI** - Pool devices for 70B+ models
+
+**New: Enhancement Plan V2 (Phases 54-63)** 🆕
+- 🧠 **Model Optimization** - 87.5% size reduction with INT4 quantization
+- 🔥 **Thermal Management** - Predictive throttling prevents overheating
+- 📊 **Workload Distribution** - Smart placement across OnHead/BeltWorn/Phone/Cloud
+- ⚡ **Intent Scheduling** - Context-aware AI task prioritization
+- 🧪 **Chaos Engineering** - 12 fault types, automated recovery validation
+- 🚩 **Feature Flags** - 4 build profiles (256MB-2GB), runtime toggles
+- 🛡️ **Security Presets** - Paranoid/High/Balanced/Relaxed modes
+- 💰 **Spending Guards** - Daily limits, transaction cooldown, recovery config
+- 🎨 **Progressive UX** - 4 expertise levels (Beginner→Expert)
+- 🔌 **Intent API** - External app integration with 7 intent types
+- 🔄 **Interoperability** - Companion protocol for cross-device sync
+- 🖥️ **Desktop Bridge** - File sync and notifications with desktop
 
 ---
 
