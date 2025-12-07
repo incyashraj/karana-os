@@ -6,12 +6,14 @@ pub mod encryption;
 pub mod biometric;
 pub mod access_control;
 pub mod secure_storage;
+pub mod defaults; // Phase 59: Security defaults
 
 pub use authentication::*;
 pub use encryption::*;
 pub use biometric::*;
 pub use access_control::*;
 pub use secure_storage::*;
+pub use defaults::{SecurityManager as SecurityDefaults, SecurityPreset, Permission, SpendingGuard};
 
 use std::collections::HashMap;
 
