@@ -31,6 +31,7 @@ pub mod orchestrator; // Phase 54: Async event-driven orchestrator
 pub mod testing; // Phase 56: Chaos engineering and fault injection
 pub mod feature_flags; // Phase 57: Feature flag system and build profiles
 pub mod ux; // Phase 58: Progressive disclosure UX
+pub mod interop; // Phase 62: Interoperability and companion protocol
 pub mod glasses;
 pub mod voice;
 pub mod voice_pipeline;

@@ -30,5 +30,7 @@ pub mod routes;
 pub mod handlers;
 pub mod types;
 pub mod state;
+pub mod intent; // Phase 61: Intent API for external apps
 
 pub use server::{start_api_server, start_api_server_with_veil, start_api_server_with_state};
+pub use intent::{IntentAPI, Intent, IntentResponse, AppRegistration};
