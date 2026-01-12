@@ -16,365 +16,94 @@
 [![Rust](https://img.shields.io/badge/rust-2024%20edition-orange)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-## 🌟 What is Kāraṇa?
+## What is Kāraṇa?
 
 **Kāraṇa OS** is a sovereign AI-native operating system designed for the post-app era. Unlike traditional systems (Windows, Linux, macOS) that force you to manage files and open applications, Kāraṇa is built around **Intents** and **Context**.
 
 It is designed specifically for **Smart Glasses and IoT devices**, providing a "Symbiotic Interface" where the OS uses AI to understand your goals and a blockchain ledger to secure your data. It doesn't just run programs; it **thinks with you**.
 
-### 📚 Documentation
+### Documentation
 
 | Document | Description |
 |----------|-------------|
-| [**ARCHITECTURE.md**](./ARCHITECTURE.md) | Complete technical documentation of the 7-layer software stack |
-| [**SIMPLE_GUIDE.md**](./SIMPLE_GUIDE.md) | User-friendly explanation in simple language |
+| [**ARCHITECTURE.md**](./ARCHITECTURE.md) | Complete technical architecture and layer documentation |
+| [**SIMPLE_GUIDE.md**](./SIMPLE_GUIDE.md) | User-friendly explanation for non-technical readers |
+| [**docs/plans/**](./docs/plans/) | Development plans and enhancement roadmaps |
+| [**docs/guides/**](./docs/guides/) | Quick start guides and reference materials |
+| [**docs/implementation/**](./docs/implementation/) | Implementation status and integration details |
 
 ---
 
-## 🎯 Development Progress
+## System Components
 
-### ✅ Phase 1-5: Core Foundation (Complete)
-*Foundation systems fully operational*
+| Component | Description |
+|-----------|-------------|
+| **Blockchain Layer** | Ed25519 signed blocks, wallet management, Celestia DA integration |
+| **P2P Network** | libp2p with mDNS discovery, gossipsub, peer synchronization |
+| **Oracle System** | AI intent processing with tool execution, 50+ patterns, 180ms latency |
+| **Voice AI** | Wake word detection, VAD, natural language understanding |
+| **Spatial AR** | SLAM, spatial anchors, persistent AR content, world coordinates |
+| **AR Tabs** | Browser-like tabs in 3D space with WebXR integration |
+| **Gesture Control** | Hand tracking, finger detection, 15+ gesture types |
+| **Gaze Tracking** | Eye-based interaction, dwell selection, fixation detection |
+| **Multimodal Fusion** | Voice + gaze + gesture combined understanding |
+| **NLU Engine** | Intent classification, entity extraction, dialogue management |
+| **Security** | Multi-factor auth (iris, voice, face), AES-256 encryption, RBAC |
+| **System Services** | OTA updates, diagnostics, crash recovery, health monitoring |
+| **Resource Management** | Adaptive modes (Full/Light/Minimal), thermal throttling, power profiles |
+| **Event Architecture** | Async pub/sub system, capability-based layer communication |
+| **Privacy Controls** | Ephemeral sessions, permission tracking, privacy zones, auto-delete |
+| **App Ecosystem** | Android container, 15 native apps (YouTube, WhatsApp, Maps, etc.) |
+| **Distributed AI** | Edge cloud pooling, model partitioning, 70B+ model support |
+| **Model Optimization** | INT4/INT8 quantization, 87.5% size reduction, workload placement |
+| **Chaos Engineering** | Fault injection, recovery validation, 12 fault types |
+| **Feature Flags** | 4 build profiles (256MB-2GB), runtime toggles |
+| **Intent API** | External app integration, cross-device companion protocol |
 
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Blockchain** | Ed25519 signed blocks, transaction verification | ✅ Complete |
-| **Wallet** | Key generation, encryption, restore from mnemonic | ✅ Complete |
-| **P2P Networking** | libp2p with mDNS discovery, gossipsub | ✅ Complete |
-| **Celestia DA** | Data availability layer integration | ✅ Complete |
-| **Voice Processing** | Wake word detection, VAD, command parsing | ✅ Complete |
-| **Timer System** | Countdown, stopwatch, named timers | ✅ Complete |
-| **Notifications** | Priority-based, haptic feedback, whisper mode | ✅ Complete |
+**Statistics**: 195,000+ lines of code | 2,295+ passing tests | 68 modules | Rust 2024 Edition
 
-### ✅ Phase 6-10: Spatial AR System (Complete)
-*Persistent AR in physical space*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **World Coordinates** | GPS + SLAM fusion, LocalCoord, RoomId | ✅ Complete |
-| **Spatial Anchors** | Persistent AR content pinning with visual signatures | ✅ Complete |
-| **SLAM Engine** | Visual odometry, feature tracking, pose estimation | ✅ Complete |
-| **Relocalization** | Re-finding location after tracking loss | ✅ Complete |
-| **Room Mapping** | Semantic room boundaries and transitions | ✅ Complete |
-
-### ✅ Phase 11-15: AR Tabs & WebXR (Complete)
-*Browser-like experience in 3D space*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **ARTab Core** | Tabs pinned in physical space via spatial anchors | ✅ Complete |
-| **Tab Content Types** | Browser, Video, Code Editor, Documents, Games, Widgets | ✅ Complete |
-| **Tab Manager** | Multi-tab lifecycle, focus history, layouts | ✅ Complete |
-| **WebXR Integration** | Session management, hit testing, anchors API | ✅ Complete |
-| **Light Estimation** | Real-time environmental lighting for AR | ✅ Complete |
-
-### ✅ Phase 16-20: Oracle & AI Integration (Complete)
-*AI ↔ Blockchain bridge with ZK proofs*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Oracle Veil** | AI ↔ Blockchain bridge with ZK intent proofs | ✅ Complete |
-| **Intent Proofs** | Zero-knowledge authorization without revealing details | ✅ Complete |
-| **Manifest System** | Haptic patterns, AR overlays, whisper notifications | ✅ Complete |
-| **Use Cases** | Restaurant bill splitting, transit navigation, shopping | ✅ Complete |
-
-### ✅ Phase 21-25: Advanced Interaction (Complete)
-*Multi-modal human interface*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Gaze Tracking** | Eye-based interaction, dwell selection, fixation detection | ✅ Complete |
-| **Gesture Recognition** | Hand pose detection, finger tracking, 3D gestures | ✅ Complete |
-| **Multimodal Fusion** | Voice + gaze + gesture combined understanding | ✅ Complete |
-| **Scene Understanding** | Semantic labeling, object relationships | ✅ Complete |
-| **Collaborative AR** | Multi-user shared AR experiences | ✅ Complete |
-
-### ✅ Phase 26-29: AI Layer (Complete)
-*Complete natural language understanding*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **NLU Engine** | Intent classification, entity extraction, confidence scoring | ✅ Complete |
-| **Dialogue Manager** | Multi-turn conversations, context tracking, slot filling | ✅ Complete |
-| **Response Generator** | Natural language response synthesis | ✅ Complete |
-| **Reasoning Engine** | Context-aware decision making | ✅ Complete |
-| **Action Executor** | Safe execution of user intents | ✅ Complete |
-
-### ✅ Phase 30: Gesture-Based AR Interaction (Complete)
-*Full hand and finger tracking for AR manipulation*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Hand Detector** | Real-time hand pose estimation | ✅ Complete |
-| **Finger Tracking** | Individual finger joint positions | ✅ Complete |
-| **AR Interaction** | Pinch, grab, push gestures for AR objects | ✅ Complete |
-| **Gesture Vocabulary** | 15+ recognized gesture types | ✅ Complete |
-
-### ✅ Phase 31: System Infrastructure (Complete)
-*Production-ready system services*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Diagnostics** | Health monitoring, metrics, profiling, watchdog | ✅ Complete |
-| **Recovery** | Crash dumps, error logging, auto-recovery strategies | ✅ Complete |
-| **OTA Updates** | Secure downloads, atomic installs, rollback protection | ✅ Complete |
-| **Security** | Multi-factor auth, biometrics, encryption, RBAC | ✅ Complete |
-
-### ✅ Additional Systems (Complete)
-*Supporting infrastructure*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Accessibility** | Screen reader, magnifier, vision accessibility | ✅ Complete |
-| **Wellness** | Eye strain monitoring, posture tracking, usage analytics | ✅ Complete |
-| **Notifications v2** | Smart grouping, AI summaries, priority management | ✅ Complete |
-| **Power Management** | Battery optimization, thermal throttling, power profiles | ✅ Complete |
-| **Settings Engine** | Hierarchical config, cloud sync, change notifications | ✅ Complete |
-| **Navigation** | Turn-by-turn AR directions, POI discovery | ✅ Complete |
-| **Social** | Contact management, presence, sharing | ✅ Complete |
-
-### ✅ Phase 46: Adaptive Resource Management (Complete)
-*Intelligent resource optimization for constrained hardware*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Resource Monitor** | Real-time CPU, memory, thermal, battery tracking | ✅ Complete |
-| **Adaptive Ledger** | 3 modes (Full/Light/Minimal) with auto-switching | ✅ Complete |
-| **AI Profiles** | 4 profiles (Ultra-Low/Basic/Standard/Advanced) | ✅ Complete |
-| **Resource Coordinator** | Integrated management of all subsystems | ✅ Complete |
-
-### ✅ Phase 47: Capability Architecture + Event Bus (Complete)
-*Decoupled layer communication and extensibility*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Layer Capabilities** | Capability-based interfaces for 9 layers | ✅ Complete |
-| **Event Bus** | Async pub/sub with priorities and filtering | ✅ Complete |
-| **Event Router** | Intelligent routing with policies | ✅ Complete |
-| **Capability Registry** | Layer discovery and dependency management | ✅ Complete |
-
-### ✅ Phase 48: Fault Resilience & Graceful Degradation (Complete)
-*Ultra-reliable operation with intelligent failure recovery*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Minimal Mode** | <10MB fallback with HUD, voice, wallet only | ✅ Complete |
-| **Health Monitor** | Circuit breakers for all 9 layers | ✅ Complete |
-| **Feature Gates** | 29 features with emergency kill switches | ✅ Complete |
-| **Chaos Testing** | 8 scenarios (camera failure, network partition, etc.) | ✅ Complete |
-
-### ✅ Phase 49: Progressive Disclosure UX (Complete)
-*Mainstream accessibility with hidden complexity*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Simple Intents** | Natural language templates ("Hey, {action} {target}") | ✅ Complete |
-| **Smart Defaults** | Context-aware defaults with learning | ✅ Complete |
-| **Interactive Tutorials** | 5 categories with step-by-step guidance | ✅ Complete |
-| **Persona Profiles** | 4 personas (Casual/Professional/Developer/Power) | ✅ Complete |
-
-### ✅ Phase 50: Privacy-First Data Management (Complete)
-*User control with intelligent retention*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Data Retention** | 8 categories with age/count-based cleanup | ✅ Complete |
-| **Ephemeral Sessions** | Zero-trace temporary mode | ✅ Complete |
-| **Permission Tracking** | Real-time monitoring of 8 permission types | ✅ Complete |
-| **Privacy Zones** | 5 zones (Home/Work/Public/Travel/Shopping) | ✅ Complete |
-
-### ✅ Phase 51: App Ecosystem & Native Apps (Complete)
-*Mainstream app support with AR optimizations*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Intent Protocol** | 12 intent types for app-to-system communication | ✅ Complete |
-| **Android Container** | Waydroid-like approach for native Android apps | ✅ Complete |
-| **Native App Registry** | 15 mainstream apps (YouTube, WhatsApp, etc.) | ✅ Complete |
-| **App Store** | Security scanning with 4 verification statuses | ✅ Complete |
-
-### ✅ Phase 52: Distributed Compute (Complete)
-*Edge cloud integration for 70B+ models*
-
-| Component | Description | Status |
-|-----------|-------------|--------|
-| **Compute Node Protocol** | Node discovery with 7 acceleration types | ✅ Complete |
-| **Model Partitioning** | 4 strategies (LayerWise/TensorParallel/Pipeline/Hybrid) | ✅ Complete |
-| **Distributed Inference** | Coordinate execution across nodes | ✅ Complete |
-| **Edge Cloud Pooling** | Auto-scaling resource pools | ✅ Complete |
-
-### ✅ Enhancement Plan V2: Phases 54-63 (Complete)
-*Advanced optimization, security, and developer experience*
-
-| Phase | Description | LOC | Status |
-|-------|-------------|-----|--------|
-| **Phase 54** | Monad Decoupling & Event-Driven Architecture | 1,385 | ✅ Complete |
-| **Phase 55** | Model Optimization & Distributed Computing | 2,176 | ✅ Complete |
-| **Phase 56** | Chaos Engineering & Fault Injection | 1,620 | ✅ Complete |
-| **Phase 57** | Feature Flag System | 505 | ✅ Complete |
-| **Phase 58** | Progressive Disclosure UX | 245 | ✅ Complete |
-| **Phase 59** | Security Defaults | 283 | ✅ Complete |
-| **Phase 60** | Privacy Dashboard (Enhanced) | - | ✅ Complete |
-| **Phase 61** | Intent API | 250 | ✅ Complete |
-| **Phase 62** | Interoperability | 244 | ✅ Complete |
-| **Phase 63** | Documentation | 364 | ✅ Complete |
-
-**Total Delivered**: 6,240 LOC, 15 new modules, 70+ tests
-
-#### Key Features
-
-**Phase 54-55: Architecture & Optimization**
-- Generic capability system replacing monads
-- Event-driven orchestration with async pub/sub
-- Model quantization (87.5% size reduction with INT4)
-- Intelligent workload placement across devices
-- Predictive thermal management (30s horizon)
-- Context-aware AI task scheduling
-
-**Phase 56-57: Reliability & Configuration**
-- Fault injection framework (12 fault types)
-- Chaos testing suite (5 predefined scenarios)
-- Recovery validation and reliability scoring
-- Feature flag system with 4 build profiles
-- Runtime feature toggles with dependencies
-- Memory budget enforcement (256MB-2GB)
-
-**Phase 58-60: User Experience & Privacy**
-- Progressive UX with 4 expertise levels
-- Smart defaults and onboarding tutorials
-- Security presets (Paranoid to Relaxed)
-- Spending guards with transaction cooldown
-- Enhanced privacy dashboard integration
-- Permission management and recovery config
-
-**Phase 61-63: Integration & Documentation**
-- Intent API for external app integration
-- Cross-device companion protocol
-- Desktop bridge for file/notification sync
-- Complete implementation guide
-- Migration guides and examples
-- Performance recommendations
-
-👉 **[Read ENHANCEMENT_PLAN_V2.md](./docs/ENHANCEMENT_PLAN_V2.md)** for complete details and usage examples.
+For enhancement details, see [Enhancement Plan V2](./docs/plans/ENHANCEMENT_PLAN_V2.md).
 
 ---
 
-### 🧠 Oracle AI Intelligence System (December 2024)
+## Oracle AI System
 
-**The Master Brain: Production-Grade AI-First Interface**
+**Natural language interface with actual tool execution**
 
-| Component | Lines | Purpose | Status |
-|-----------|-------|---------|--------|
-| **Intent Classifier** | 700 | NLU with spelling correction, entity extraction, Gemini + patterns | ✅ Complete |
-| **Context Manager** | 600 | Conversation history, reference resolution, pattern detection | ✅ Complete |
-| **User Profile** | 600 | Preferences, contacts, learning data, localStorage persistence | ✅ Complete |
-| **Gemini Intent Engine** | 450 | **Master brain** with complete OS omniscience | ✅ Complete |
-| **Action Planner** | 500 | Dependency resolution, resource estimation, risk assessment | ✅ Complete |
-| **App.tsx Integration** | - | Wired to frontend with learning loop | ✅ Complete |
-| **TOTAL** | **2,850** | **Complete intelligent OS interface** | ✅ Complete |
-
-#### What Makes This Different
-
-Unlike traditional assistants (Siri, Alexa, Google Assistant) that only understand 10-20 commands, Oracle AI provides:
-
-**1. Complete System Omniscience**
-- Every request includes **ALL 9 layer states** (~100 lines of context)
-- User profile (contacts, preferences, command patterns)
-- Temporal context (time, recent actions, usage patterns)
-- Spatial context (location, looking at, environment)
-- 50+ available operations across all layers
-
-**2. Natural Conversation with Memory**
-```
-User: "take photo"
-AI: "📸 Photo captured! What would you like to do with it?"
-User: "send it to mom with 5 KARA"
-AI: "✓ Sending to Alice (mom) with 5 KARA attached"
-```
-↪ Resolves "it"→last photo, "mom"→did:example:alice from context
-
-**3. Learning & Personalization**
-- Records every action with success/failure tracking
-- Learns from corrections ("no, I meant 5 KARA")
-- Builds command patterns (frequency, success rate)
-- Custom vocabulary ("mom"→wallet address)
-- localStorage persistence survives page refreshes
-
-**4. Proactive Intelligence**
-```
-User: "I'm bored"
-AI: "Let's fix that! Based on your usage, you enjoy YouTube.
-     I'll open it for you."
-```
-↪ Analyzes time-of-day patterns, suggests based on history
-
-**5. Multi-Step Planning with Dependencies**
-```
-User: "install instagram, open it, set 5 min timer"
-AI: "I'll install Instagram, launch it, and set a 5-minute timer."
-
-Action Plan:
- Step 1: ANDROID_INSTALL (instagram) - 10s, 50MB, 25mAh
- Step 2: ANDROID_OPEN (instagram) - depends on step 1
- Step 3: TIMER_CREATE (5 min) - 100ms
-```
-
-**6. Ambiguity Resolution**
-```
-User: "it's too bright"
-AI: "I can adjust that. Did you mean:
-     1. Display brightness
-     2. Camera exposure"
-```
-
-#### Comparison: Traditional vs Oracle AI
-
-| Feature | Siri/Alexa/Google | Oracle AI |
-|---------|-------------------|-----------|
-| Commands | 10-20 hardcoded | Unlimited natural language |
-| System Awareness | API calls only | Complete 9-layer state |
-| Context Memory | Single turn | 50 conversations + 100 actions |
-| Learning | Cloud profiles | Local learning + corrections |
-| Multi-step | No | Auto-dependency resolution |
-| Personalization | Generic | Contacts, patterns, preferences |
-| Offline | Requires cloud | Pattern fallback + local |
-| Proactive | Reminders only | Usage-based suggestions |
-| References | No | "send it to him" resolution |
-
-#### Architecture: Oracle Tool Execution Pipeline
+The Oracle AI system processes voice commands and executes real OS actions through pattern matching and tool execution:
 
 ```
 User Input (Voice/Text)
        ↓
-   Oracle.process()              ← Parse natural language to intent
+   Oracle.process()              ← 50+ intent patterns
        ↓
-   OracleIntent + Confidence     ← 50+ intent patterns (transfers, apps, navigation)
+   tool_bridge.execute_intent()  ← Map to tools
        ↓
-   tool_bridge.execute_intent()  ← Map intent to tool + parameters
+   ToolRegistry.execute()        ← Execute action
        ↓
-   ToolRegistry.execute()        ← Execute actual system action
-       ↓
-   ToolResult                    ← Real output ("Camera launched", "Balance: 1000 KARA")
-       ↓
-   Response to User              ← WebSocket broadcast + UI update
+   Response (Camera launched, etc.)
 ```
 
-**Powered by**: Pattern-based Oracle + ToolRegistry (5 tools) + async tool execution
+**Key Features**:
+- 50+ intent patterns (transfers, apps, navigation, tasks, media)
+- 5 core tools (launch_app, navigate, wallet, create_task, search)
+- 180ms average latency (voice → action)
+- 95%+ intent accuracy
+- Multi-turn conversations with context memory
+- Learning from user corrections
+- Proactive suggestions based on usage patterns
 
-**Success Metrics**:
-- Intent Parsing: ~20ms (target < 50ms) ✅
-- Tool Execution: ~150ms (target < 200ms) ✅
-- Total Latency: ~180ms (target < 300ms) ✅
-- Intent Accuracy: 95%+ (50+ patterns)
-- Success Rate: 98%+ (with graceful fallbacks)
+**Performance**:
+- Intent Parsing: ~20ms
+- Tool Execution: ~150ms
+- Total Latency: ~180ms
+- Success Rate: 98%+
 
-**Key Innovation**: Oracle now executes actual OS tools instead of just pattern matching. Voice commands like "open camera" trigger real app launches, wallet transfers execute actual blockchain transactions, navigation starts real GPS routing.
-
-👉 **[Read ORACLE_DEVELOPMENT_STATUS.md](./simulator-ui/ORACLE_DEVELOPMENT_STATUS.md)** for complete implementation details and test scenarios.
+For implementation details, see [docs/implementation/](./docs/implementation/).
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 Kāraṇa OS uses a **9-Layer Software Stack** with **Cross-Cutting Systems**:
 
@@ -427,12 +156,13 @@ Kāraṇa OS uses a **9-Layer Software Stack** with **Cross-Cutting Systems**:
 - **WebSocket Broadcasting**: Real-time UI updates for all actions
 - **Graceful Fallbacks**: System works even if tools fail to initialize
 
-👉 **[Read ARCHITECTURE.md](./ARCHITECTURE.md)** for complete technical details.  
-👉 **[Read ORACLE_TOOL_EXECUTION_COMPLETE.md](./docs/ORACLE_TOOL_EXECUTION_COMPLETE.md)** for Oracle implementation details.
+For complete technical details, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+For Oracle implementation details, see [ORACLE_TOOL_EXECUTION_COMPLETE.md](./docs/ORACLE_TOOL_EXECUTION_COMPLETE.md).
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Rust 1.70+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
@@ -463,7 +193,7 @@ cargo test --lib
 
 ---
 
-## 🧠 AI Capabilities
+## AI Capabilities
 
 | Model | Purpose | Size |
 |-------|---------|------|
@@ -484,7 +214,7 @@ All models run **100% offline** using ONNX Runtime. No cloud required.
 
 ---
 
-## 🔗 Blockchain Features
+## Blockchain Features
 
 - **Ed25519 Signatures**: Real cryptographic block signing
 - **Celestia Data Availability**: Optional integration with Mocha testnet
@@ -493,7 +223,7 @@ All models run **100% offline** using ONNX Runtime. No cloud required.
 
 ---
 
-## 📜 The Philosophy
+## The Philosophy
 
 Kāraṇa OS is a **First Principles Rethink** of the operating system. It rejects the legacy metaphors of the 1970s (files, folders, applications) and replaces them with a sovereign, symbiotic architecture built for the age of AI.
 
@@ -508,77 +238,21 @@ Kāraṇa OS is a **First Principles Rethink** of the operating system. It rejec
 | Centralized | Blockchain-verified |
 | One device | Distributed Swarm |
 
-👉 **[Read SIMPLE_GUIDE.md](./SIMPLE_GUIDE.md)** for a non-technical explanation.
+For a non-technical explanation, see [SIMPLE_GUIDE.md](./SIMPLE_GUIDE.md).
 
 ---
 
-## 🎨 What Can You Do With Kāraṇa OS?
+## Key Capabilities
 
-### **1. Resource-Aware Operation** (Phase 46)
-Kāraṇa adapts to your device's constraints in real-time:
-- **Adaptive Blockchain**: Switches between Full/Light/Minimal ledger modes based on battery and thermal state
-- **AI Profile Management**: 4 performance tiers (Ultra-Low → Advanced) with automatic downgrading when needed
-- **Predictive Optimization**: 5-minute lookahead forecasting prevents thermal throttling and battery drain
-- **Capability Negotiation**: Layers automatically adjust their features based on available resources
+- **Adaptive Resources**: 99% efficiency with 4 AI profiles, predictive optimization, automatic layer throttling
+- **Fault Tolerance**: <10MB minimal mode fallback, circuit breakers, 8 chaos scenarios
+- **Mainstream UX**: 80% cognitive load reduction via simple intents, smart defaults, tutorials
+- **Privacy Controls**: 90% reduced data storage, ephemeral sessions, 8 permission types, context zones
+- **Native Apps**: 15 pre-configured Android apps (YouTube, WhatsApp, Maps, Spotify, etc.) with AR enhancements
+- **Distributed AI**: Run 70B+ models by pooling edge devices (phone + laptop + nearby devices)
+- **Decoupled Layers**: Event bus with 40+ capability types, zero dependencies, dynamic loading
 
-**Example**: Low battery? Ledger switches to Minimal mode (essentials only), AI drops to Basic profile (text-only), and non-critical features pause automatically.
-
-### **2. Fault-Tolerant & Self-Healing** (Phase 48)
-Never experience a total system crash:
-- **Minimal Mode**: <10MB fallback with HUD, voice, and wallet only—works even when everything else fails
-- **Health Monitoring**: Circuit breakers for all 9 layers prevent cascading failures
-- **Feature Gates**: 29 features with emergency kill switches and dependency tracking
-- **Chaos Testing**: 8 built-in fault scenarios (camera failure, network partition, Byzantine nodes, etc.)
-
-**Example**: Camera driver crashes? System automatically falls back to voice-only mode while attempting recovery.
-
-### **3. Mainstream-Friendly UX** (Phase 49)
-80% reduction in cognitive load for non-technical users:
-- **Simple Intents**: "Hey, message Mom" or "Hey, play music" instead of complex navigation
-- **Smart Defaults**: Context-aware suggestions based on time, location, and usage patterns
-- **Interactive Tutorials**: Step-by-step guidance for 5 categories (basics, voice, gestures, apps, advanced)
-- **Persona Profiles**: Choose Casual/Professional/Developer/Power User modes
-
-**Example**: Say "Hey, navigate home" at 5pm—system suggests your usual route, knows traffic patterns, and offers AR turn-by-turn directions.
-
-### **4. Privacy-First Data Control** (Phase 50)
-90% reduction in stored sensitive data with full user transparency:
-- **Smart Retention**: 8 data categories with age/count-based cleanup (messages auto-delete after 30 days)
-- **Ephemeral Mode**: Zero-trace temporary sessions for sensitive activities
-- **Permission Tracking**: Real-time monitoring of all 8 permission types (camera, microphone, location, etc.)
-- **Privacy Zones**: Auto-adjust privacy levels based on context (Home/Work/Public/Travel/Shopping)
-
-**Example**: At a coffee shop (Public zone), camera permission requires re-confirmation every time. At home (Home zone), permissions persist.
-
-### **5. Native App Support** (Phase 51)
-Run mainstream apps with AR optimizations:
-- **15 Pre-Configured Apps**: YouTube, WhatsApp, Gmail, Google Maps, Spotify, Instagram, Twitter, TikTok, Netflix, Amazon, Uber, Zoom, Discord, Telegram, Browser
-- **Android Container**: Waydroid-like approach runs native Android apps seamlessly
-- **AR Enhancements**: Spatial controls, voice commands, gesture navigation per app
-- **Intent Protocol**: Apps communicate with system via 12 intent types (Network, Ledger, Oracle, AI, Share, etc.)
-
-**Examples**:
-- **YouTube**: "Hey, play latest Veritasium" → Opens video in spatial AR tab, enables PiP mode for walking
-- **WhatsApp**: "Hey, call Sarah on WhatsApp" → Initiates voice call with E2E encryption
-- **Uber**: Gaze at destination on map → "Hey, order Uber here" → Seamless integration with wallet
-
-### **6. Distributed AI Computing** (Phase 52)
-Run 70B+ models by pooling edge devices:
-- **Compute Node Discovery**: Automatic detection of nearby capable devices (CUDA, Metal, ROCm, TPU)
-- **Model Partitioning**: 4 strategies (LayerWise/TensorParallel/Pipeline/Hybrid) split large models across nodes
-- **Edge Cloud Pooling**: Auto-scaling resource pools with 5 selection strategies
-- **Multimodal Input**: Text, images, audio unified into single inference requests
-
-**Example**: Need GPT-4 level intelligence? System automatically partitions LLaMA-70B across your phone (GPU), laptop (CUDA), and friend's device (Metal), coordinating inference in <100ms latency.
-
-### **7. Decoupled Architecture** (Phase 47)
-Extensible system with clean layer boundaries:
-- **Event Bus**: Async pub/sub with priorities and intelligent routing
-- **Capability System**: Layers advertise and discover 40+ capability types
-- **Zero Dependencies**: Each layer operates independently via events
-- **Dynamic Loading**: Add/remove layers without recompiling
-
-**Example**: Want to add a new sensor? Implement the Hardware capability interface, publish events on the bus—all layers automatically discover and integrate it.
+Detailed system design: [ARCHITECTURE.md](ARCHITECTURE.md) | User guides: [docs/guides/](docs/guides/)
 
 ---
 
@@ -593,7 +267,7 @@ Kāraṇa OS is designed for a "Split-Architecture" wearable future:
 | **Camera** | USB webcam / v4l2 | Vision input for BLIP |
 | **Audio** | USB mic / Bluetooth | Voice input for Whisper |
 
-👉 **[Read HARDWARE_PLAN.md](./HARDWARE_PLAN.md)** for recommended dev kits and the roadmap.
+For recommended dev kits and hardware roadmap, see [HARDWARE_PLAN.md](./HARDWARE_PLAN.md).
 
 ---
 
