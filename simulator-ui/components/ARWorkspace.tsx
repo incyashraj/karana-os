@@ -1,14 +1,15 @@
 import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import ARWindow from './ARWindow';
+import AppStore from './AppStore';
 import { 
   Monitor, Video, Globe, Terminal, FileText, Image, Music, Calendar, Mail, 
-  Plus, Layers, Grid3X3, X, Sparkles, Box, Layout
+  Plus, Layers, Grid3X3, X, Sparkles, Box, Layout, Smartphone
 } from 'lucide-react';
 
 export interface WindowConfig {
   id: string;
   title: string;
-  type: 'video' | 'browser' | 'terminal' | 'notes' | 'image' | 'music' | 'calendar' | 'mail' | 'custom';
+  type: 'video' | 'browser' | 'terminal' | 'notes' | 'image' | 'music' | 'calendar' | 'mail' | 'appstore' | 'custom';
   position: { x: number; y: number };
   size: { width: number; height: number };
   depth: number;
@@ -46,6 +47,7 @@ const APP_TEMPLATES: Record<WindowConfig['type'], Omit<WindowConfig, 'id' | 'pos
   music: { title: 'Music', type: 'music', size: { width: 350, height: 450 }, depth: 0 },
   calendar: { title: 'Calendar', type: 'calendar', size: { width: 350, height: 400 }, depth: 0 },
   mail: { title: 'Mail', type: 'mail', size: { width: 450, height: 500 }, depth: 0 },
+  appstore: { title: 'App Store', type: 'appstore', size: { width: 900, height: 600 }, depth: 0 },
   custom: { title: 'Custom', type: 'custom', size: { width: 500, height: 400 }, depth: 0 },
 };
 
@@ -256,6 +258,18 @@ const ARWorkspace = forwardRef<ARWorkspaceHandle, ARWorkspaceProps>(({ isActive,
 
             {/* Quick Launch Apps */}
             <div className="grid grid-cols-4 gap-4 mb-6">
+              {/* App Store - Featured */}
+              <button
+                onClick={() => spawnWindow(APP_TEMPLATES['appstore'])}
+                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 border border-blue-500/30 hover:border-blue-500/50 transition-all group"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/40 to-cyan-500/40 flex items-center justify-center transition-transform group-hover:scale-110">
+                  <Smartphone size={24} className="text-blue-200" />
+                </div>
+                <span className="text-xs font-medium text-blue-200">App Store</span>
+                <span className="text-[10px] text-blue-300/70">NEW</span>
+              </button>
+              
               {APP_TEMPLATE_LIST.map((app, i) => (
                 <button
                   key={i}

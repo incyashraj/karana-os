@@ -39,6 +39,7 @@ celestia-types = "0.17.0"
 reqwest = { version = "0.11", features = ["json"] }
 base64 = "0.21"
 lru = "0.12.5"
+urlencoding = "2.1"
 ratatui = "0.29.0"
 crossterm = "0.29.0"
 tui-logger = { version = "0.17.4", features = ["crossterm"] }
@@ -66,6 +67,7 @@ zeroize = { version = "1.8", features = ["derive"] }
 async-trait = "0.1"
 bincode = "1.3"
 zstd = "0.13"
+meval = "0.2"
 
 # Modern GUI for simulator
 eframe = { version = "0.29", optional = true }
@@ -80,11 +82,20 @@ uuid = { version = "1.0", features = ["v4"] }
 dirs = "5.0"
 nalgebra = "0.33"
 regex = "1.10"
+clap = { version = "4.5", features = ["derive"] }
+
+# WebSocket for real-time voice AI communication
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+
+# Enhanced Voice Activity Detection (optional feature)
+webrtc-vad = { version = "0.4", optional = true }
 
 [features]
 default = []
 v4l2 = ["rscam"]
 gui = ["eframe", "egui", "egui_extras"]
+webrtc-vad = ["dep:webrtc-vad"]  # Enable ML-based VAD
 
 [[example]]
 name = "glasses_gui"

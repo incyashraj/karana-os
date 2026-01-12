@@ -400,7 +400,9 @@ impl TabCommandParser {
         }
 
         // Default to search
-        format!("https://google.com/search?q={}", urlencoding::encode(input))
+        // Simple URL encoding - replace spaces with +
+        let encoded = input.replace(' ', "+");
+        format!("https://google.com/search?q={}", encoded)
     }
 
     /// Extract location hint from input

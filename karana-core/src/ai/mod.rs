@@ -1,3 +1,13 @@
+// Phase 54: Agentic Oracle modules
+pub mod agentic;
+pub mod memory;
+pub mod reasoning;  // Phase 2: Advanced reasoning engine
+pub mod dialogue;   // Phase 4: Conversational intelligence
+pub mod adaptive_loader;  // Phase 5: Battery-aware model selection
+pub mod optimization;  // Phase 5: Inference optimization
+pub mod query_router;  // Phase 6: Intelligent query routing
+pub mod react_agent;  // Phase 6: ReAct reasoning + acting
+
 use anyhow::{Context, Result, anyhow};
 use candle_core::{Device, Tensor, DType, Module};
 use candle_nn::VarBuilder;
@@ -11,6 +21,15 @@ use hf_hub::{api::sync::Api, Repo, RepoType};
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex as StdMutex, Mutex};
+
+// Re-export for convenience
+pub use reasoning::{ChainOfThoughtReasoner, ReasoningContext, ReasoningChain, QueryType};
+pub use dialogue::{DialogueManager, ProactiveEngine, UserProfile, InteractionStyle};
+pub use adaptive_loader::{AdaptiveModelLoader, AdaptivePolicy, ModelSize, ResourceStatus, PerformanceStats};
+pub use optimization::{InferenceProfiler, GenerationConfig, QuantizationLevel, InferenceBatcher};
+pub use query_router::{QueryRouter, QueryIntent, RouteDecision, ToolName};
+pub use react_agent::{ReActAgent, AgentResponse, AgentStep};
 
 // Phase 55: Model optimization and intelligent scheduling
 pub mod distillation;
@@ -290,6 +309,12 @@ pub struct KaranaAI {
     intent_embeddings: HashMap<String, Vec<f32>>,
     // Infeasible Action Cache: Pre-computed embeddings for things glasses CAN'T do
     infeasible_embeddings: HashMap<String, (Vec<f32>, String, String)>, // (embedding, reason, alternative)
+    // Phase 5: Performance optimization
+    adaptive_loader: Option<Arc<Mutex<adaptive_loader::AdaptiveModelLoader>>>,
+    profiler: Option<Arc<Mutex<optimization::InferenceProfiler>>>,
+    // Phase 6: Agentic capabilities
+    query_router: Option<QueryRouter>,
+    tool_registry: Option<Arc<agentic::ToolRegistry>>,
 }
 
 impl KaranaAI {
@@ -323,6 +348,12 @@ impl KaranaAI {
             mel_filters: Vec::new(),
             intent_embeddings: HashMap::new(),
             infeasible_embeddings: HashMap::new(),
+            adaptive_loader: Some(Arc::new(Mutex::new(
+                adaptive_loader::AdaptiveModelLoader::new(adaptive_loader::AdaptivePolicy::default())
+            ))),
+            profiler: Some(Arc::new(Mutex::new(optimization::InferenceProfiler::new()))),
+            query_router: QueryRouter::new().ok(),
+            tool_registry: Some(Arc::new(agentic::ToolRegistry::new())),
         };
 
         // Pre-compute intent template embeddings for semantic matching
@@ -725,22 +756,15 @@ impl KaranaAI {
     }
 
     pub fn predict(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
-        // STRATEGY: Semantic Intent Matching using REAL embeddings
-        // 
-        // Instead of using the crashing GGUF model, we use a smarter approach:
-        // 1. FIRST check if user is asking for something glasses CAN'T do
-        // 2. Embed the user query using working MiniLM model
-        // 3. Compare against pre-computed intent embeddings via cosine similarity
-        // 4. Extract parameters using intelligent regex
-        // 5. Return structured JSON that the Oracle can parse
-        //
-        // This is actually MORE RELIABLE than LLM parsing because:
-        // - Embeddings are deterministic and fast
-        // - No hallucination of incorrect JSON
-        // - Works offline on embedded devices (glasses)
-        // - System-aware: knows what glasses can and can't do
+        // Phase 5: Start timing and profiling
+        let start_time = std::time::Instant::now();
         
-        let _ = max_tokens; // Will use for gen model when available
+        // PHASE 1: Perfect AI Oracle - Always use REAL LLM
+        // Strategy:
+        // 1. Try to use TinyLlama/Phi-3 (real generative model)
+        // 2. If not available, load it on-demand
+        // 3. Use semantic matching as preprocessing (not replacement)
+        // 4. Always generate natural language, not just JSON
         
         // FIRST: Check if this is an infeasible action for smart glasses
         if let Some((category, reason, alternative)) = self.check_infeasible_action(prompt) {
@@ -751,16 +775,118 @@ impl KaranaAI {
             ));
         }
         
-        // Try semantic matching for valid intents
-        if let Some((action, confidence)) = self.match_intent_semantically(prompt) {
-            let response = self.build_semantic_response(&action, prompt, confidence);
+        // Try semantic matching for quick intent classification
+        let intent_hint = if let Some((action, confidence)) = self.match_intent_semantically(prompt) {
             log::info!("[AI] Semantic match: {} (conf: {:.0}%)", action, confidence * 100.0);
-            return Ok(response);
-        }
+            Some((action, confidence))
+        } else {
+            None
+        };
 
-        // Fallback to rule-based parsing
-        log::info!("[AI] No semantic match, using rule-based parsing");
-        self.predict_smart_fallback(prompt)
+        // REAL LLM INFERENCE (Not fallback!)
+        log::info!("[AI] Using real LLM for generation");
+        
+        // Ensure generative model is loaded
+        if self.gen_model.is_none() {
+            log::info!("[AI] Loading generative model on-demand...");
+            match Self::load_gen_model(&self.device) {
+                Ok((model, tokenizer)) => {
+                    self.gen_model = model;
+                    self.gen_tokenizer = tokenizer;
+                }
+                Err(e) => {
+                    log::warn!("[AI] Failed to load generative model: {}. Using enhanced semantic response.", e);
+                    // Enhanced fallback with intent hint
+                    if let Some((action, confidence)) = intent_hint {
+                        return Ok(self.build_semantic_response(&action, prompt, confidence));
+                    }
+                    return self.predict_smart_fallback(prompt);
+                }
+            }
+        }
+        
+        // Build contextual prompt
+        let enhanced_prompt = if let Some((ref action, _confidence)) = intent_hint {
+            format!("User query (likely about '{}'): {}\n\nProvide a helpful, natural response:", action, prompt)
+        } else {
+            format!("User query: {}\n\nProvide a helpful, natural response:", prompt)
+        };
+        
+        // Real LLM inference using TinyLlama/Phi-3
+        if let Some(profiler) = &self.profiler {
+            profiler.lock().unwrap().start_operation("llm_generation");
+        }
+        
+        let result = match self.generate_with_llm(&enhanced_prompt, max_tokens) {
+            Ok(response) => {
+                log::info!("[AI] ✓ LLM generated response ({} chars)", response.len());
+                Ok(response)
+            }
+            Err(e) => {
+                log::warn!("[AI] LLM generation failed: {}. Using semantic fallback.", e);
+                if let Some((action, confidence)) = intent_hint {
+                    Ok(self.build_semantic_response(&action, prompt, confidence))
+                } else {
+                    self.predict_smart_fallback(prompt)
+                }
+            }
+        };
+        
+        // End profiling and record timing
+        if let Some(profiler) = &self.profiler {
+            profiler.lock().unwrap().end_operation();
+            profiler.lock().unwrap().end_operation();  // End predict_total
+        }
+        
+        let duration_ms = start_time.elapsed().as_secs_f32() * 1000.0;
+        self.record_inference_time(duration_ms);
+        log::debug!("[AI] Inference time: {:.2}ms", duration_ms);
+        
+        result
+    }
+    
+    /// Core LLM generation function
+    fn generate_with_llm(&mut self, prompt: &str, max_tokens: usize) -> Result<String> {
+        let model = self.gen_model.as_mut()
+            .ok_or_else(|| anyhow!("Generative model not loaded"))?;
+        let tokenizer = self.gen_tokenizer.as_ref()
+            .ok_or_else(|| anyhow!("Tokenizer not loaded"))?;
+        
+        // Tokenize input
+        let tokens = tokenizer.encode(prompt, true)
+            .map_err(|e| anyhow!("Tokenization error: {}", e))?
+            .get_ids()
+            .to_vec();
+        
+        let mut generated = tokens.clone();
+        let mut logits_processor = LogitsProcessor::new(
+            299792458,  // seed
+            Some(0.8),  // temperature (0.8 for creative but coherent)
+            Some(0.95)  // top_p (nucleus sampling)
+        );
+        
+        // Generate tokens
+        for i in 0..max_tokens {
+            let input = Tensor::new(generated.as_slice(), &self.device)?
+                .unsqueeze(0)?;
+            let logits = model.forward(&input, generated.len())?;
+            let logits = logits.squeeze(0)?;
+            let next_logits = logits.get(logits.dim(0)? - 1)?;
+            let next_token = logits_processor.sample(&next_logits)?;
+            
+            // Check for end of sequence
+            if next_token == tokenizer.token_to_id("</s>").unwrap_or(2) {
+                break;
+            }
+            
+            generated.push(next_token);
+        }
+        
+        // Decode only the generated part (skip prompt)
+        let response = tokenizer.decode(&generated[tokens.len()..], true)
+            .map_err(|e| anyhow!("Decoding error: {}", e))?;
+        
+        Ok(response.trim().to_string())
     }
 
     /// Build a structured JSON response based on semantic match
@@ -1047,5 +1173,41 @@ impl KaranaAI {
         
         log::info!("[AI] ✓ Heuristic action: {:?}", action);
         Ok(action)
+    }
+
+    /// Get current performance statistics (Phase 5)
+    pub fn get_performance_stats(&self) -> Option<adaptive_loader::PerformanceStats> {
+        self.adaptive_loader.as_ref().map(|loader| {
+            loader.lock().unwrap().stats()
+        })
+    }
+
+    /// Get inference profiler report (Phase 5)
+    pub fn get_profiler_report(&self) -> Option<String> {
+        self.profiler.as_ref().map(|profiler| {
+            profiler.lock().unwrap().report()
+        })
+    }
+
+    /// Set adaptive policy (Phase 5)
+    pub fn set_adaptive_policy(&mut self, policy: adaptive_loader::AdaptivePolicy) {
+        if let Some(loader) = &self.adaptive_loader {
+            let mut loader = loader.lock().unwrap();
+            *loader = adaptive_loader::AdaptiveModelLoader::new(policy);
+        }
+    }
+
+    /// Force specific model size (Phase 5)
+    pub fn force_model_size(&mut self, size: Option<adaptive_loader::ModelSize>) {
+        if let Some(loader) = &self.adaptive_loader {
+            loader.lock().unwrap().force_model(size);
+        }
+    }
+
+    /// Record inference time for adaptive tuning (Phase 5)
+    fn record_inference_time(&self, duration_ms: f32) {
+        if let Some(loader) = &self.adaptive_loader {
+            loader.lock().unwrap().record_inference_time(duration_ms);
+        }
     }
 }

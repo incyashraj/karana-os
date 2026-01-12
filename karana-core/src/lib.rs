@@ -1,8 +1,10 @@
 pub mod types;
 pub mod net;
+pub mod network; // Real-time WebSocket communication
 pub mod boot;
 pub mod runtime;
 pub mod ui;
+pub mod ar_bridge;
 pub mod vigil;
 pub mod storage;
 pub mod monad;

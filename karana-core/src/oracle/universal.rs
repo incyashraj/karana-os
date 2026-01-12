@@ -2,7 +2,7 @@
 // Phase 41: Transform oracle from intent executor to universal knowledge companion
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, bail};
 
@@ -10,6 +10,9 @@ use super::embeddings::{EmbeddingGenerator, cosine_similarity};
 use super::swarm_knowledge::SwarmKnowledge;
 use super::knowledge_manager::KnowledgeManager;
 use super::knowledge_graph::{KnowledgeGraphBuilder, KnowledgeGraph};
+use super::web_search::{WebSearchEngine, WebSearchResult};
+use super::knowledge_base::{OfflineKnowledgeBase, WikiArticle};
+use super::cache::{SearchCache, EmbeddingCache, CachedResult};
 
 /// Universal query response with provenance
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,6 +65,11 @@ pub struct UniversalOracle {
     swarm_knowledge: Arc<SwarmKnowledge>,
     knowledge_manager: Option<Arc<KnowledgeManager>>,
     graph_builder: Arc<KnowledgeGraphBuilder>,
+    ai: Option<Arc<StdMutex<crate::ai::KaranaAI>>>,  // For LLM synthesis
+    web_search: Option<Arc<WebSearchEngine>>,  // Phase 3: Web search
+    offline_kb: Option<Arc<StdMutex<OfflineKnowledgeBase>>>,  // Phase 3: Wikipedia
+    search_cache: Arc<SearchCache>,  // Phase 5: Result caching
+    embedding_cache: Arc<EmbeddingCache>,  // Phase 5: Embedding caching
 }
 
 impl UniversalOracle {
@@ -76,12 +84,36 @@ impl UniversalOracle {
             swarm_knowledge: Arc::new(SwarmKnowledge::new("did:karana:anonymous".to_string())),
             knowledge_manager: None,  // Set via set_knowledge_manager()
             graph_builder: Arc::new(KnowledgeGraphBuilder::new()),
+            ai: None,  // Set via set_ai()
+            web_search: Some(Arc::new(WebSearchEngine::new())),  // Phase 3: Enabled by default
+            offline_kb: None,  // Set via set_offline_kb()
+            search_cache: Arc::new(SearchCache::new(1000)),  // Phase 5: 1000 cached queries
+            embedding_cache: Arc::new(EmbeddingCache::new(500)),  // Phase 5: 500 cached embeddings
         })
     }
     
     /// Set the knowledge manager for user's personal knowledge
     pub fn set_knowledge_manager(&mut self, manager: Arc<KnowledgeManager>) {
         self.knowledge_manager = Some(manager);
+    }
+    
+    /// Set AI instance for LLM-based synthesis
+    pub fn set_ai(&mut self, ai: Arc<StdMutex<crate::ai::KaranaAI>>) {
+        self.ai = Some(ai);
+    }
+    
+    /// Set offline knowledge base (Wikipedia)
+    pub fn set_offline_kb(&mut self, kb: Arc<StdMutex<OfflineKnowledgeBase>>) {
+        self.offline_kb = Some(kb);
+    }
+    
+    /// Enable/disable web search
+    pub fn set_web_search_enabled(&mut self, enabled: bool) {
+        if enabled && self.web_search.is_none() {
+            self.web_search = Some(Arc::new(WebSearchEngine::new()));
+        } else if !enabled {
+            self.web_search = None;
+        }
     }
     
     /// Get reference to knowledge manager
@@ -91,47 +123,111 @@ impl UniversalOracle {
 
     /// Main entry point - handle any query
     pub async fn query(&self, query: &str, context: &QueryContext) -> Result<UniversalResponse> {
+        // 0. Check cache first (Phase 5: Performance optimization)
+        if let Some(cached) = self.search_cache.get(query) {
+            log::info!("[UniversalOracle] ⚡ Cache hit for: {}", query);
+            return Ok(UniversalResponse {
+                answer: cached.answer,
+                source: ResponseSource::LocalKnowledge,
+                confidence: cached.confidence,
+                proof: None,
+                follow_up: vec!["Tell me more".to_string()],
+            });
+        }
+
         // 1. Try computation first (math, logic) - deterministic and fast
         if let Some(response) = self.compute_answer(query)? {
+            // Cache computational results (they don't change)
+            self.search_cache.put(
+                query.to_string(),
+                CachedResult::new(response.answer.clone(), response.confidence, 86400) // 24h TTL
+            );
             return Ok(response);
         }
 
-        // 2. Embed query
+        // 2. Embed query (with caching)
         let embedding = self.embed_query(query)?;
 
         // 3. Try user's personal knowledge first (highest priority)
         if self.user_knowledge_enabled {
             if let Some(response) = self.query_user_knowledge(&embedding, query).await? {
+                // Cache user knowledge results (1 hour TTL)
+                self.search_cache.put(
+                    query.to_string(),
+                    CachedResult::new(response.answer.clone(), response.confidence, 3600)
+                );
                 return Ok(response);
             }
         }
 
-        // 4. Try local RAG (offline, fast)
-        if let Some(response) = self.query_local(&embedding, query).await? {
+        // 4. Try offline Wikipedia knowledge base (fast, comprehensive)
+        if let Some(response) = self.query_offline_wikipedia(query).await? {
+            // Cache Wikipedia results (6 hours TTL - semi-static)
+            self.search_cache.put(
+                query.to_string(),
+                CachedResult::new(response.answer.clone(), response.confidence, 21600)
+            );
             return Ok(response);
         }
 
-        // 4. Try swarm peers (semi-online, decentralized)
+        // 5. Try local RAG (offline, fast)
+        if let Some(response) = self.query_local(&embedding, query).await? {
+            // Cache RAG results (2 hours TTL)
+            self.search_cache.put(
+                query.to_string(),
+                CachedResult::new(response.answer.clone(), response.confidence, 7200)
+            );
+            return Ok(response);
+        }
+
+        // 6. Try swarm peers (semi-online, decentralized)
         if self.swarm_query_enabled {
             if let Some(response) = self.query_swarm(query, context).await? {
+                // Cache swarm results (30 min TTL - dynamic)
+                self.search_cache.put(
+                    query.to_string(),
+                    CachedResult::new(response.answer.clone(), response.confidence, 1800)
+                );
                 return Ok(response);
             }
         }
 
-        // 5. Fallback to web proxy (fully online, privacy concern)
+        // 7. Try web search (online, broad knowledge)
+        if let Some(response) = self.query_web_search(query).await? {
+            // Cache web results (15 min TTL - frequently changing)
+            self.search_cache.put(
+                query.to_string(),
+                CachedResult::new(response.answer.clone(), response.confidence, 900)
+            );
+            return Ok(response);
+        }
+
+        // 8. Fallback to web proxy (fully online, privacy concern)
         if self.web_proxy_enabled {
             if let Some(response) = self.query_web_proxy(query, context).await? {
                 return Ok(response);
             }
         }
 
-        // 6. Generate best-effort response
+        // 9. Generate best-effort response
         self.generate_fallback(query)
     }
 
-    /// Embed query text to vector
+    /// Embed query text to vector (with caching)
     fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
-        self.embedding_gen.embed(text)
+        // Check cache first
+        if let Some(cached_embedding) = self.embedding_cache.get(text) {
+            log::debug!("[UniversalOracle] Embedding cache hit");
+            return Ok(cached_embedding);
+        }
+        
+        // Generate embedding
+        let embedding = self.embedding_gen.embed(text)?;
+        
+        // Cache it
+        self.embedding_cache.put(text.to_string(), embedding.clone());
+        
+        Ok(embedding)
     }
 
     /// Query user's personal knowledge base
@@ -214,6 +310,124 @@ impl UniversalOracle {
         Ok(None)
     }
 
+    /// Query offline Wikipedia knowledge base (Phase 3)
+    async fn query_offline_wikipedia(&self, query: &str) -> Result<Option<UniversalResponse>> {
+        let kb = match &self.offline_kb {
+            Some(kb) => kb,
+            None => return Ok(None),
+        };
+
+        let kb_lock = kb.lock().unwrap();
+        
+        // Try exact title match first
+        if let Some(article) = kb_lock.get_article(query).ok().flatten() {
+            log::info!("[UniversalOracle] Found exact Wikipedia article: {}", article.title);
+            return Ok(Some(UniversalResponse {
+                answer: article.summary.clone(),
+                source: ResponseSource::LocalKnowledge,
+                confidence: 0.95,
+                proof: None,
+                follow_up: vec![
+                    "Tell me more".to_string(),
+                    "Related topics".to_string(),
+                ],
+            }));
+        }
+        
+        // Try full-text search
+        let results = kb_lock.full_text_search(query, 3).ok().unwrap_or_default();
+        
+        if !results.is_empty() {
+            let best = &results[0];
+            log::info!("[UniversalOracle] Found Wikipedia match: {}", best.title);
+            
+            return Ok(Some(UniversalResponse {
+                answer: format!("{}\n\nSource: Wikipedia - {}", best.summary, best.title),
+                source: ResponseSource::LocalKnowledge,
+                confidence: 0.8,
+                proof: None,
+                follow_up: vec![
+                    "Read full article".to_string(),
+                    format!("More about {}", best.categories.first().unwrap_or(&"this topic".to_string())),
+                ],
+            }));
+        }
+        
+        Ok(None)
+    }
+
+    /// Query web search (Phase 3)
+    async fn query_web_search(&self, query: &str) -> Result<Option<UniversalResponse>> {
+        let search = match &self.web_search {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+
+        log::info!("[UniversalOracle] Searching web for: {}", query);
+        
+        let results = match search.search(query, 5).await {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("[UniversalOracle] Web search failed: {}", e);
+                return Ok(None);
+            }
+        };
+        
+        if results.is_empty() {
+            return Ok(None);
+        }
+        
+        // Synthesize answer from web results
+        let synthesized = self.synthesize_web_results(&results, query)?;
+        
+        log::info!("[UniversalOracle] Web search successful, {} results", results.len());
+        
+        Ok(Some(UniversalResponse {
+            answer: synthesized,
+            source: ResponseSource::WebProxy,
+            confidence: 0.75,
+            proof: None,
+            follow_up: vec![
+                "More details".to_string(),
+                "Related searches".to_string(),
+            ],
+        }))
+    }
+
+    /// Synthesize answer from web search results
+    fn synthesize_web_results(&self, results: &[WebSearchResult], query: &str) -> Result<String> {
+        if results.is_empty() {
+            return Ok(String::new());
+        }
+        
+        // Build context from search results
+        let context = results.iter()
+            .take(3)
+            .enumerate()
+            .map(|(i, r)| format!("[{}] {}: {}", i + 1, r.title, r.snippet))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        
+        // Try LLM synthesis if available
+        if let Some(ai) = &self.ai {
+            let prompt = format!(
+                "Based on these web search results, provide a clear answer.\n\n{}\n\nQuestion: {}\n\nAnswer:",
+                context, query
+            );
+            
+            let mut ai_lock = ai.lock().unwrap();
+            if let Ok(answer) = ai_lock.predict(&prompt, 150) {
+                return Ok(format!("{}\n\nSources: {}", 
+                    answer.trim(),
+                    results.iter().take(2).map(|r| &r.title).cloned().collect::<Vec<_>>().join(", ")
+                ));
+            }
+        }
+        
+        // Fallback: use best snippet
+        Ok(format!("{}\n\nSource: {}", results[0].snippet, results[0].title))
+    }
+
     /// Query external web via proxy
     async fn query_web_proxy(&self, _query: &str, _context: &QueryContext) -> Result<Option<UniversalResponse>> {
         // TODO: Implement web proxy (privacy-preserving)
@@ -270,17 +484,58 @@ impl UniversalOracle {
         }
     }
 
-    /// Synthesize answer from RAG results
-    fn synthesize_answer(&self, results: &[RagChunk], _query: &str) -> Result<String> {
-        // Simple concatenation for now
-        // TODO: Use LLM to synthesize coherent answer
-        let combined = results.iter()
+    /// Synthesize answer from RAG results using real LLM
+    fn synthesize_answer(&self, results: &[RagChunk], query: &str) -> Result<String> {
+        // PHASE 1: Perfect AI Oracle - Real LLM Synthesis
+        
+        if results.is_empty() {
+            return Ok("I couldn't find relevant information to answer that question.".to_string());
+        }
+        
+        // Build context from RAG results (top 5 most relevant)
+        let context = results.iter()
+            .take(5)
+            .enumerate()
+            .map(|(i, r)| {
+                format!("Source {}: {}\n{}", 
+                    i + 1, 
+                    r.source_doc,
+                    r.text.chars().take(500).collect::<String>() // Limit context length
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        
+        // Construct prompt for LLM synthesis
+        let prompt = format!(
+            "Based on the following information sources, provide a clear and concise answer to the question.\n\n\
+             Information:\n{}\n\n\
+             Question: {}\n\n\
+             Answer (be natural and helpful):",
+            context, query
+        );
+        
+        // Use real AI to synthesize natural language answer if available
+        if let Some(ai) = &self.ai {
+            let mut ai_lock = ai.lock().unwrap();
+            match ai_lock.predict(&prompt, 200) {
+                Ok(answer) => {
+                    log::info!("[UniversalOracle] ✓ LLM synthesized answer ({} chars)", answer.len());
+                    return Ok(answer.trim().to_string());
+                }
+                Err(e) => {
+                    log::warn!("[UniversalOracle] LLM synthesis failed: {}. Using fallback.", e);
+                }
+            }
+        }
+        
+        // Fallback: improved concatenation with source attribution
+        let fallback = results.iter()
             .take(2)
             .map(|r| r.text.as_str())
             .collect::<Vec<_>>()
             .join(" ");
-
-        Ok(combined)
+        Ok(format!("Based on available information: {}", fallback))
     }
 
     /// Try to compute math answer

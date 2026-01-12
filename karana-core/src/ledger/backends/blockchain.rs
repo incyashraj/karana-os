@@ -9,6 +9,7 @@
 use super::{LedgerBackend, BackendStats, BackendConfig, SyncResult};
 use crate::chain::{Block, Transaction, Blockchain};
 use crate::economy::{Ledger, Governance};
+use crate::ai::KaranaAI;
 use anyhow::{Result, Context};
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
@@ -28,7 +29,9 @@ impl BlockchainBackend {
         // Initialize ledger and governance
         let ledger_path = format!("{}/ledger.db", config.data_dir);
         let ledger = Arc::new(Mutex::new(Ledger::new(&ledger_path)));
-        let gov = Arc::new(Mutex::new(Governance::new(ledger.clone())));
+        // Governance requires path, ledger, and AI - creating with default path
+        let ai = Arc::new(Mutex::new(KaranaAI::new().context("Failed to initialize AI")?));
+        let gov = Arc::new(Mutex::new(Governance::new("governance.db", ledger.clone(), ai)));
         
         // Create blockchain
         let blockchain = Arc::new(Mutex::new(Blockchain::new(
@@ -199,10 +202,9 @@ impl LedgerBackend for BlockchainBackend {
         
         // Get parent hash
         let parent_hash = if block.header.height > 0 {
-            let blocks = chain.blocks.lock().unwrap();
-            blocks.get((block.header.height - 1) as usize)
-                .map(|b| b.hash.clone())
-                .unwrap_or_else(|| "0".repeat(64))
+            // Get the latest block to determine parent hash
+            let latest = chain.latest_block();
+            latest.hash.clone()
         } else {
             "0".repeat(64)
         };

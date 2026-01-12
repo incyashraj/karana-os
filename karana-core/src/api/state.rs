@@ -7,6 +7,7 @@ use crate::wallet::KaranaWallet;
 use crate::api::types::{Transaction, OsMode, PendingAction, WhisperOverlay, ManifestState};
 use crate::oracle::command::{OracleCommand, CommandResult, CommandData, OracleChannels, MonadChannels};
 use crate::oracle::veil::OracleVeil;
+use crate::assistant::ToolRegistry;
 
 /// Default expiration time for pending actions (60 seconds)
 const PENDING_ACTION_TTL_SECS: u64 = 60;
@@ -54,11 +55,23 @@ pub struct AppState {
     
     /// Oracle Veil for mediated intent processing (optional - None for standalone API mode)
     pub oracle_veil: Option<Arc<Mutex<OracleVeil>>>,
+    
+    /// Tool Registry for executing Oracle intents
+    pub tool_registry: Option<Arc<ToolRegistry>>,
 }
 
 impl AppState {
     /// Create standalone API state (without OracleVeil)
     pub fn new() -> Arc<Self> {
+        // Initialize default tool registry
+        let tool_registry = match ToolRegistry::new() {
+            Ok(registry) => Some(Arc::new(registry)),
+            Err(e) => {
+                log::warn!("[AppState] Failed to initialize ToolRegistry: {}", e);
+                None
+            }
+        };
+        
         Arc::new(Self {
             wallet: RwLock::new(None),
             balance: RwLock::new(1000), // Start with 1000 KARA for testing
@@ -71,11 +84,21 @@ impl AppState {
             whispers: RwLock::new(Vec::new()),
             last_haptic: RwLock::new(None),
             oracle_veil: None,
+            tool_registry,
         })
     }
     
     /// Create API state with OracleVeil (for full Monad integration)
     pub fn with_oracle_veil(veil: OracleVeil) -> Arc<Self> {
+        // Initialize default tool registry
+        let tool_registry = match ToolRegistry::new() {
+            Ok(registry) => Some(Arc::new(registry)),
+            Err(e) => {
+                log::warn!("[AppState] Failed to initialize ToolRegistry: {}", e);
+                None
+            }
+        };
+        
         Arc::new(Self {
             wallet: RwLock::new(None),
             balance: RwLock::new(1000),
@@ -88,6 +111,7 @@ impl AppState {
             whispers: RwLock::new(Vec::new()),
             last_haptic: RwLock::new(None),
             oracle_veil: Some(Arc::new(Mutex::new(veil))),
+            tool_registry,
         })
     }
     

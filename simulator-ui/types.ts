@@ -21,6 +21,17 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   metadata?: any;
+  manifest?: OracleManifest;
+}
+
+export interface OracleManifest {
+  text: string;
+  voice_script: string;
+  haptic_pattern: 'Success' | 'Neutral' | 'Warning' | 'Error';
+  confidence: number;
+  reasoning_trace: string[];
+  historical_context: string[];
+  suggested_followup: string | null;
 }
 
 export type IntentType = 'SPEAK' | 'TRANSFER' | 'ANALYZE' | 'NAVIGATE' | 'TIMER' | 'WALLET';
@@ -108,4 +119,26 @@ export interface Proposal {
   createdAt: number;
   endsAt: number;
   executionData?: string;
+}
+
+// ========================
+// UI TYPES
+// ========================
+export type ToastType = 'info' | 'success' | 'warning' | 'error';
+
+export interface ActionStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'active' | 'completed' | 'failed';
+}
+
+export interface Risk {
+  level: 'low' | 'medium' | 'high';
+  description: string;
+}
+
+export interface Suggestion {
+  id: string;
+  text: string;
+  icon?: string;
 }

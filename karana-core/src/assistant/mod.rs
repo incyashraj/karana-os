@@ -6,12 +6,24 @@ pub mod synthesis;
 pub mod commands;
 pub mod context;
 pub mod conversation;
+pub mod tool_registry;
+pub mod state_context;
+pub mod enhanced_vad;
+pub mod tts_service;
+pub mod voice_handler;
+pub mod ai_oracle;  // Unified AI Oracle
 
 pub use recognition::*;
 pub use synthesis::*;
 pub use commands::*;
 pub use context::*;
 pub use conversation::*;
+pub use tool_registry::*;
+pub use state_context::*;
+pub use enhanced_vad::*;
+pub use tts_service::*;
+pub use voice_handler::*;
+pub use ai_oracle::{AIOracle, OracleResponse as AIResponse, OracleMode};
 
 use std::collections::HashMap;
 
@@ -172,7 +184,7 @@ impl VoiceAssistant {
 
         // Get context for the command - convert to CommandContext
         let current_ctx = self.context_manager.get_current_context();
-        let context = CommandContext {
+        let context = commands::CommandContext {
             location: current_ctx.location.as_ref().map(|l| l.name.clone()),
             time_of_day: Some(current_ctx.time_of_day.clone()),
             recent_apps: Vec::new(),

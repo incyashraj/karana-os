@@ -1,0 +1,437 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { MousePointer2, Pin, Globe, Hand, ArrowRight, ArrowLeft, ArrowUp, ArrowDown, Grid } from 'lucide-react';
+import { HandLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+import { SpatialState } from '../types/spatial';
+import { CalibrationOverlay } from './CalibrationOverlay';
+import { SensorFusionService } from '../services/SensorFusionService';
+import { VisionService } from '../services/VisionService';
+
+interface Anchor {
+  id: string;
+  x: number;
+  y: number;
+  content: string;
+}
+
+interface AROverlayProps {
+    cameraFeedRef?: React.RefObject<any>;
+    spatialState?: SpatialState;
+    onSpatialUpdate?: (newState: SpatialState) => void;
+    viewOffset: { x: number, y: number };
+    onViewOffsetChange: (newOffset: { x: number, y: number }) => void;
+}
+
+export const AROverlay: React.FC<AROverlayProps> = ({ cameraFeedRef, spatialState, onSpatialUpdate, viewOffset, onViewOffsetChange }) => {
+  const [anchors, setAnchors] = useState<Anchor[]>([]);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [handDetected, setHandDetected] = useState(false);
+  const [gesture, setGesture] = useState<string>("None");
+  
+  // Calibration State
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [showCalibration, setShowCalibration] = useState(true);
+
+  // Off-screen Indicator State
+  const [offScreenDirection, setOffScreenDirection] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
+  const [gyroEnabled, setGyroEnabled] = useState(false);
+  const sensorFusionRef = useRef<SensorFusionService>(new SensorFusionService());
+  const visionServiceRef = useRef<VisionService>(new VisionService());
+  const visionOffsetRef = useRef({ x: 0, y: 0 });
+
+  const lastMousePos = useRef({ x: 0, y: 0 });
+  const handLandmarkerRef = useRef<HandLandmarker | null>(null);
+  const requestRef = useRef<number>(0);
+
+  // Gyroscope Handler (Mobile AR)
+  useEffect(() => {
+    if (!gyroEnabled) return;
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+        if (event.alpha === null || event.beta === null || event.gamma === null) return;
+
+        // Use Sensor Fusion Service (SLERP + Neck Model)
+        const gyroOffset = sensorFusionRef.current.update(event.alpha, event.beta, event.gamma);
+
+        // Combine with Vision Offset (Optical Flow)
+        onViewOffsetChange({
+            x: gyroOffset.x + visionOffsetRef.current.x,
+            y: gyroOffset.y + visionOffsetRef.current.y
+        });
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [gyroEnabled, onViewOffsetChange]);
+
+  const enableSensors = async () => {
+      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+          try {
+              const permission = await (DeviceOrientationEvent as any).requestPermission();
+              if (permission === 'granted') {
+                  setGyroEnabled(true);
+              }
+          } catch (e) {
+              console.error(e);
+          }
+      } else {
+          // Non-iOS devices usually don't need permission
+          setGyroEnabled(true);
+      }
+  };
+
+  const handleCalibrationComplete = () => {
+      setIsCalibrated(true);
+      setShowCalibration(false);
+      sensorFusionRef.current.reset();
+  };
+
+  
+  // Check if window is off-screen
+  useEffect(() => {
+    if (!spatialState) return;
+    
+    const windowX = spatialState.x + viewOffset.x;
+    const windowY = spatialState.y + viewOffset.y;
+    const windowWidth = 800; // Approx width
+    const windowHeight = 600; // Approx height
+    
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Center point of the window
+    const centerX = windowX + windowWidth / 2;
+    const centerY = windowY + windowHeight / 2;
+    
+    if (centerX < 0) setOffScreenDirection('left');
+    else if (centerX > screenWidth) setOffScreenDirection('right');
+    else if (centerY < 0) setOffScreenDirection('up');
+    else if (centerY > screenHeight) setOffScreenDirection('down');
+    else setOffScreenDirection(null);
+    
+  }, [spatialState, viewOffset]);
+
+  // Initialize MediaPipe HandLandmarker
+  useEffect(() => {
+    const initHandLandmarker = async () => {
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
+        );
+        handLandmarkerRef.current = await HandLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+            delegate: "GPU"
+          },
+          runningMode: "VIDEO",
+          numHands: 1
+        });
+        console.log("HandLandmarker initialized");
+      } catch (error) {
+        console.error("Error initializing HandLandmarker:", error);
+      }
+    };
+    initHandLandmarker();
+  }, []);
+
+  const lastPinchState = useRef(false);
+  const hoverElementRef = useRef<Element | null>(null);
+  const dragTargetRef = useRef<'window' | 'content' | null>(null);
+
+  // Hand Tracking Loop
+  const processVideo = () => {
+    const videoElement = cameraFeedRef?.current?.video;
+    if (videoElement && videoElement.readyState >= 2) {
+      
+      // 1. Run Optical Flow (Vision Service)
+      // Only run if calibrated to save resources during setup
+      if (isCalibrated) {
+          const flow = visionServiceRef.current.processFrame(videoElement);
+          // Accumulate flow to the vision offset
+          visionOffsetRef.current.x += flow.x;
+          visionOffsetRef.current.y += flow.y;
+      }
+
+      // 2. Run Hand Tracking
+      if (handLandmarkerRef.current) {
+        const results = handLandmarkerRef.current.detectForVideo(videoElement, performance.now());
+      
+        if (results.landmarks && results.landmarks.length > 0) {
+          setHandDetected(true);
+          const landmarks = results.landmarks[0];
+          
+          // Index Finger Tip (8)
+          const indexTip = landmarks[8];
+          // Thumb Tip (4)
+          const thumbTip = landmarks[4];
+
+        // Map coordinates (0-1) to screen
+        const x = (1 - indexTip.x) * window.innerWidth;
+        const y = indexTip.y * window.innerHeight;
+
+        setMousePos({ x, y });
+
+        // Detect Pinch (Distance between Thumb and Index)
+        const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+        const isPinching = distance < 0.05; // Threshold
+
+        // --- INTERACTION LOGIC ---
+        
+        // 1. Hit Test (Find element under "cursor")
+        const element = document.elementFromPoint(x, y);
+        
+        // Visual Feedback for Hover
+        if (element !== hoverElementRef.current) {
+            if (hoverElementRef.current) {
+                hoverElementRef.current.classList.remove('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+            }
+            if (element && (element.tagName === 'BUTTON' || element.tagName === 'A' || element.getAttribute('role') === 'button' || element.classList.contains('clickable'))) {
+                element.classList.add('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+                hoverElementRef.current = element;
+            } else {
+                hoverElementRef.current = null;
+            }
+        }
+
+        // 2. Click / Drag Logic
+        if (isPinching && !lastPinchState.current) {
+            // Pinch Start (MouseDown)
+            setGesture("Pinch (Click)");
+            setIsDragging(true);
+            
+            // Check if we are grabbing the window handle
+            if (element && element.closest('.spatial-handle')) {
+                dragTargetRef.current = 'window';
+            } else if (element && (element.tagName === 'BUTTON' || element.tagName === 'A' || element.getAttribute('role') === 'button' || element.classList.contains('clickable'))) {
+                dragTargetRef.current = 'content';
+                if (element) {
+                    const clickEvent = new MouseEvent('click', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: x,
+                        clientY: y
+                    });
+                    element.dispatchEvent(clickEvent);
+                }
+            } else {
+                dragTargetRef.current = 'world';
+            }
+        } else if (!isPinching && lastPinchState.current) {
+            // Pinch End (MouseUp)
+            setGesture("Open Hand");
+            setIsDragging(false);
+            dragTargetRef.current = null;
+        } else if (isPinching) {
+             setGesture("Pinch (Hold)");
+             
+             const dx = x - lastMousePos.current.x;
+             const dy = y - lastMousePos.current.y;
+
+             // Handle Dragging
+             if (dragTargetRef.current === 'window' && onSpatialUpdate && spatialState) {
+                 onSpatialUpdate({
+                     ...spatialState,
+                     x: spatialState.x + dx,
+                     y: spatialState.y + dy,
+                     isDragging: true
+                 });
+             } else if (dragTargetRef.current === 'world' && onViewOffsetChange) {
+                 // Pan World
+                 onViewOffsetChange({
+                     x: viewOffset.x + dx,
+                     y: viewOffset.y + dy
+                 });
+                 setGesture("Pinch (Pan World)");
+             }
+        } else {
+             setGesture("Open Hand");
+        }
+
+        lastPinchState.current = isPinching;
+        lastMousePos.current = { x, y };
+
+      } else {
+        setHandDetected(false);
+        setGesture("None");
+        if (hoverElementRef.current) {
+            hoverElementRef.current.classList.remove('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+            hoverElementRef.current = null;
+        }
+      }
+    }
+    }
+    requestRef.current = requestAnimationFrame(processVideo);
+  };
+
+  useEffect(() => {
+    if (cameraFeedRef?.current?.video) {
+        console.log("AROverlay: Starting video processing loop");
+        requestRef.current = requestAnimationFrame(processVideo);
+    } else {
+        console.warn("AROverlay: No video element found in cameraFeedRef");
+    }
+    return () => cancelAnimationFrame(requestRef.current);
+  }, [cameraFeedRef]); 
+
+  // Mouse Fallback (only if hand not detected? or hybrid)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!handDetected) {
+        setMousePos({ x: e.clientX, y: e.clientY });
+        if (isDragging) {
+            const dx = e.clientX - lastMousePos.current.x;
+            const dy = e.clientY - lastMousePos.current.y;
+            onViewOffsetChange({ x: viewOffset.x + dx, y: viewOffset.y + dy });
+        }
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    const handleMouseDown = () => { if (!handDetected) setIsDragging(true); };
+    const handleMouseUp = () => { if (!handDetected) setIsDragging(false); };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handDetected, viewOffset, onViewOffsetChange]);
+
+  // Simulate "Pin to Desk" (Right Click / Long Pinch?)
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const newAnchor: Anchor = {
+      id: Date.now().toString(),
+      x: e.clientX - viewOffset.x, // Store absolute world position
+      y: e.clientY - viewOffset.y,
+      content: "Pinned Browser Tab"
+    };
+    setAnchors(prev => [...prev, newAnchor]);
+  };
+
+  return (
+    <div 
+      className="absolute inset-0 z-[9999] pointer-events-none cursor-none overflow-hidden"
+      onContextMenu={handleContextMenu}
+    >
+      {/* Calibration Overlay */}
+      {showCalibration && (
+        <div className="pointer-events-auto">
+            <CalibrationOverlay 
+                onComplete={handleCalibrationComplete} 
+                onCancel={() => setShowCalibration(false)}
+                onStart={enableSensors}
+            />
+        </div>
+      )}
+
+      {/* World Grid (Visual Reference) */}
+      <div 
+        className="absolute inset-0 pointer-events-none opacity-20"
+        style={{ 
+            transform: `translate(${viewOffset.x % 100}px, ${viewOffset.y % 100}px)` 
+        }}
+      >
+        <div className="w-[200vw] h-[200vh] -translate-x-1/2 -translate-y-1/2 absolute top-1/2 left-1/2 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:100px_100px]" />
+      </div>
+
+      {/* Off-screen Indicators */}
+      {offScreenDirection === 'left' && (
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 animate-pulse text-cyan-400 flex flex-col items-center">
+            <ArrowLeft size={32} />
+            <span className="text-[10px] font-mono">APP</span>
+        </div>
+      )}
+      {offScreenDirection === 'right' && (
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-pulse text-cyan-400 flex flex-col items-center">
+            <ArrowRight size={32} />
+            <span className="text-[10px] font-mono">APP</span>
+        </div>
+      )}
+      {offScreenDirection === 'up' && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 animate-pulse text-cyan-400 flex flex-col items-center">
+            <ArrowUp size={32} />
+            <span className="text-[10px] font-mono">APP</span>
+        </div>
+      )}
+      {offScreenDirection === 'down' && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 animate-pulse text-cyan-400 flex flex-col items-center">
+            <span className="text-[10px] font-mono">APP</span>
+            <ArrowDown size={32} />
+        </div>
+      )}
+
+      {/* Gaze Reticle */}
+      <div 
+        className={`fixed w-8 h-8 border-2 rounded-full pointer-events-none transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center z-50 ${isDragging ? 'border-amber-400 scale-125' : 'border-cyan-400/50'}`}
+        style={{ left: mousePos.x, top: mousePos.y }}
+      >
+        <div className={`w-1 h-1 rounded-full ${isDragging ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+      </div>
+      
+      {/* Gaze Label */}
+      <div 
+        className="fixed text-[10px] font-mono text-cyan-400/70 pointer-events-none transform translate-x-4 -translate-y-4"
+        style={{ left: mousePos.x, top: mousePos.y }}
+      >
+        GAZE: {Math.round(mousePos.x)}, {Math.round(mousePos.y)}
+        <br/>
+        {handDetected && <span className="text-amber-400">HAND: {gesture}</span>}
+      </div>
+
+      {/* AR Anchors (Pinned Tabs) */}
+      {anchors.map(anchor => (
+        <div
+          key={anchor.id}
+          className="absolute p-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl flex flex-col gap-2 w-48 transform transition-transform duration-75 pointer-events-auto"
+          style={{ 
+            left: anchor.x + viewOffset.x, 
+            top: anchor.y + viewOffset.y 
+          }}
+        >
+          <div className="flex items-center gap-2 text-xs font-bold text-white/80 border-b border-white/10 pb-2">
+            <Globe size={12} className="text-blue-400" />
+            <span>karana.io</span>
+            <Pin size={12} className="ml-auto text-amber-400" />
+          </div>
+          <div className="h-20 bg-white/5 rounded flex items-center justify-center text-xs text-white/30 font-mono">
+            WEB CONTENT
+          </div>
+          <div className="text-[9px] text-green-400 font-mono">
+            ANCHOR_ID: {anchor.id.substring(0, 8)}
+          </div>
+        </div>
+      ))}
+
+      {/* Instructions */}
+      <div className="absolute top-4 right-4 text-right pointer-events-auto">
+        <div className="text-xs font-bold text-white/50">AR SIMULATION MODE</div>
+        <div className="text-[10px] text-white/30">PINCH HEADER to Move Window</div>
+        <div className="text-[10px] text-white/30">PINCH BACKGROUND to Pan World</div>
+        
+        {!gyroEnabled && (
+            <button 
+                onClick={enableSensors}
+                className="mt-2 px-3 py-1 bg-cyan-500/20 border border-cyan-500/50 rounded text-[10px] text-cyan-400 font-bold hover:bg-cyan-500/40 transition-colors"
+            >
+                ENABLE GYRO (MOBILE)
+            </button>
+        )}
+
+        {handDetected ? (
+            <div className="text-xs text-green-400 font-bold mt-2 flex items-center justify-end gap-1">
+                <Hand size={12} /> HAND TRACKING ACTIVE
+            </div>
+        ) : (
+            <div className="text-xs text-red-400/50 font-bold mt-2">NO HAND DETECTED</div>
+        )}
+      </div>
+    </div>
+  );
+};
+export default AROverlay;

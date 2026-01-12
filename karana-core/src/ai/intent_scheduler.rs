@@ -411,7 +411,7 @@ impl IntentScheduler {
             InteractionState::Idle => 1.0,     // Full resources
             InteractionState::Passive => 1.2,
             InteractionState::Background => 1.3,
-            InteractionState::Sleep => 0,
+            InteractionState::Sleep => 0.5,
         };
         
         (base_time as f32 * state_multiplier) as u64

@@ -17,6 +17,7 @@ pub mod gui;
 pub mod input;
 pub mod render_proof;
 pub mod compositor;
+pub mod glasses_sim;
 
 // Legacy UI module (preserves KaranaUI)
 pub mod legacy_ui;

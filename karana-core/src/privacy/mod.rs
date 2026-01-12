@@ -15,4 +15,4 @@ pub use ephemeral::*;
 pub use face_blur::*;
 pub use permissions::*;
 pub use retention::*;
-pub use dashboard::{PrivacyDashboard, RetentionPolicy as DashboardRetentionPolicy};
+pub use dashboard::PrivacyDashboard;

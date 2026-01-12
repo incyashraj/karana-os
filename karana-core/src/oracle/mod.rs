@@ -6,7 +6,7 @@
 //! - Controls AR apps and OS functions
 //! - Provides helpful, accurate responses
 //!
-//! ## Oracle Veil Architecture (v1.1)
+//! ## Oracle Veil Architecture (v1.4 - Universal Agentic)
 //! 
 //! The Oracle Veil is the SOLE user interface for Kāraṇa OS. There are no panels,
 //! no buttons, no cluttered UI—only the Oracle's whispers. All user interactions
@@ -17,6 +17,17 @@
 //! 3. Generates ZK proofs for any action affecting state
 //! 4. Sends commands to the Monad via typed channels
 //! 5. Returns minimal AR output via `MinimalManifest` (whispers, haptics)
+//!
+//! ## Phase 54: Universal Agentic Oracle
+//! - Multi-step reasoning with tool chaining
+//! - Long-term memory and feedback loops
+//! - 200+ use case coverage (OS, knowledge, apps, creative)
+
+// Phase 54: Universal Oracle integration
+pub mod universal;
+
+// Oracle Tool Bridge - connects intents to actual execution
+pub mod tool_bridge;
 
 // Legacy modules (for backwards compatibility)
 mod intent;
@@ -31,12 +42,14 @@ pub mod sense;
 pub mod manifest;
 pub mod use_cases;
 pub mod tab_commands;
-pub mod universal;  // Phase 41: Universal query handling
 pub mod embeddings; // Phase 42: Vector embeddings
 pub mod swarm_knowledge; // Phase 42: P2P knowledge sharing
 pub mod knowledge_manager; // Phase 43: User knowledge CRUD
 pub mod knowledge_graph; // Phase 44: Knowledge graph visualization
 pub mod knowledge_sync; // Phase 45: Cross-device sync
+pub mod web_search; // Phase 3: Real-time web search
+pub mod knowledge_base; // Phase 3: Offline Wikipedia indexing
+pub mod cache; // Phase 3 & 5: Search result caching
 
 // Legacy exports
 pub use intent::*;

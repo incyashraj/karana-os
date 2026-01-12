@@ -1,20 +1,23 @@
 /**
  * Kāraṇa OS Oracle - AI Bridge Layer
  * 
- * Architecture: User → AI Oracle → Blockchain
+ * Architecture: User → AI Oracle → System Actions
  * 
- * This service is the INTERFACE between natural language and the OS.
- * ALL operations go through the Rust backend (which is on blockchain).
+ * This is the BRAIN of Kāraṇa OS. It understands EVERYTHING:
+ * - Available apps, installed apps, running apps
+ * - System capabilities (vision, wallet, AR, etc.)
+ * - User intent from natural language
+ * - Can install, launch, and manage apps automatically
  * 
  * Flow:
- * 1. User speaks/types → Frontend captures
- * 2. Frontend sends to Rust Oracle (/api/ai/oracle)
- * 3. Rust Oracle parses intent, returns structured response
- * 4. Frontend executes the action (open app, sign tx, etc.)
- * 5. For knowledge queries, use Gemini AI for real answers
+ * 1. User speaks/types → Oracle analyzes with full system context
+ * 2. Oracle decides what action to take (install app, launch, analyze vision, etc.)
+ * 3. Oracle executes or asks for permission
+ * 4. Oracle responds to user with results
  */
 
 import { karanaApi, OracleIntentResponse } from './karanaService';
+import { systemContext, AndroidApp } from './systemContext';
 import { GoogleGenAI } from "@google/genai";
 
 // ============================================================================
@@ -81,7 +84,7 @@ class OracleAI {
   
   /**
    * Process user input through the Oracle
-   * Routes to Rust backend for OS operations, Gemini for knowledge
+   * With FULL system awareness - knows about all apps, capabilities, state
    */
   async process(userInput: string, context?: OracleContext): Promise<OracleResponse> {
     const input = userInput.trim();
@@ -92,15 +95,31 @@ class OracleAI {
       this.conversationHistory = this.conversationHistory.slice(-20);
     }
     
-    // First, try to detect if this is a knowledge query vs OS command
+    // Get full system context
+    const systemInfo = systemContext.getContextForAI();
+    
+    // Check if this is an app-related request
+    const appIntent = this.detectAppIntent(input);
+    if (appIntent) {
+      return await this.handleAppIntent(appIntent, input);
+    }
+    
+    // Check for other system capabilities
+    const capabilityIntent = this.detectCapabilityIntent(input);
+    if (capabilityIntent) {
+      return this.handleCapabilityIntent(capabilityIntent, input);
+    }
+    
+    // Check if this is a knowledge query vs OS command
     const isKnowledgeQuery = this.isKnowledgeQuery(input);
     
     try {
-      // Route through Rust backend for OS operations
+      // Route through Rust backend for OS operations with full context
       const backendResponse = await karanaApi.processOracle(input, {
         vision_object: context?.visionObject,
         wallet_balance: context?.walletBalance,
-        active_app: context?.currentApp
+        active_app: context?.currentApp,
+        system_context: systemInfo // Pass full system context to backend
       });
       
       // Map backend response to our format
@@ -108,7 +127,7 @@ class OracleAI {
       
       // If it's a knowledge query or low confidence, enhance with Gemini
       if (isKnowledgeQuery || (response.confidence < 0.7 && response.intent.type === 'SPEAK')) {
-        return await this.enhanceWithGemini(input, response, context);
+        return await this.enhanceWithGemini(input, response, context, systemInfo);
       }
       
       this.conversationHistory.push({ role: 'assistant', content: response.message });
@@ -117,11 +136,294 @@ class OracleAI {
     } catch (error) {
       console.warn('Backend Oracle unavailable, using local processing:', error);
       
-      // Fallback to local processing if backend is down
-      return this.processLocally(input, context);
+      // Fallback to local processing with system context
+      return this.processLocallyWithContext(input, context, systemInfo);
     }
   }
-  
+
+  /**
+   * Detect if user wants to do something with an app
+   */
+  private detectAppIntent(input: string): { action: string; app: AndroidApp | null; query: string } | null {
+    const text = input.toLowerCase();
+    
+    // Detect action
+    let action: string | null = null;
+    if (/\b(open|launch|start|run|show|use)\b/.test(text)) {
+      action = 'launch';
+    } else if (/\b(install|download|get|add)\b/.test(text)) {
+      action = 'install';
+    } else if (/\b(close|exit|quit|stop)\b/.test(text)) {
+      action = 'close';
+    } else if (/\b(uninstall|remove|delete)\b/.test(text)) {
+      action = 'uninstall';
+    }
+    
+    if (!action) return null;
+    
+    // Extract app name - try to find known apps
+    let foundApp: AndroidApp | null = null;
+    const allApps = systemContext.getAllApps();
+    
+    for (const app of allApps) {
+      const appName = app.name.toLowerCase();
+      const appId = app.id.toLowerCase();
+      
+      if (text.includes(appName) || text.includes(appId)) {
+        foundApp = app;
+        break;
+      }
+      
+      // Check capabilities/keywords
+      for (const cap of app.capabilities) {
+        if (text.includes(cap)) {
+          foundApp = app;
+          break;
+        }
+      }
+      
+      if (foundApp) break;
+    }
+    
+    return foundApp ? { action, app: foundApp, query: input } : null;
+  }
+
+  /**
+   * Handle app-related intents with automatic installation
+   */
+  private async handleAppIntent(intent: { action: string; app: AndroidApp; query: string }): Promise<OracleResponse> {
+    const { action, app, query } = intent;
+    
+    systemContext.addActivity(`App intent: ${action} ${app.name}`);
+    
+    // Handle based on action
+    switch (action) {
+      case 'launch':
+        if (!app.installed) {
+          // App not installed - offer to install
+          return {
+            intent: { type: 'INSTALL_APP', category: 'AR_APP' },
+            message: `${app.name} is not installed. Would you like me to install it first? It's ${app.description.toLowerCase()}`,
+            data: { 
+              appId: app.id, 
+              appName: app.name,
+              needsInstall: true,
+              autoInstall: true // Flag for auto-installation
+            },
+            requiresConfirmation: true,
+            suggestedActions: [
+              `Yes, install ${app.name}`,
+              'No thanks',
+              'Tell me more about this app'
+            ],
+            confidence: 0.95
+          };
+        } else if (app.running) {
+          // Already running
+          return {
+            intent: { type: 'APP_INFO', category: 'AR_APP' },
+            message: `${app.name} is already running! Bringing it to focus.`,
+            data: { appId: app.id, appName: app.name, alreadyRunning: true },
+            requiresConfirmation: false,
+            suggestedActions: [],
+            confidence: 1.0
+          };
+        } else {
+          // Installed, ready to launch
+          return {
+            intent: { type: 'OPEN_APP', category: 'AR_APP' },
+            message: `Launching ${app.name}...`,
+            data: { appId: app.id, appName: app.name, launch: true },
+            requiresConfirmation: false,
+            suggestedActions: [],
+            confidence: 1.0
+          };
+        }
+        
+      case 'install':
+        if (app.installed) {
+          return {
+            intent: { type: 'APP_INFO', category: 'AR_APP' },
+            message: `${app.name} is already installed! Would you like me to launch it?`,
+            data: { appId: app.id, appName: app.name, alreadyInstalled: true },
+            requiresConfirmation: false,
+            suggestedActions: [`Launch ${app.name}`, 'No thanks'],
+            confidence: 1.0
+          };
+        } else {
+          return {
+            intent: { type: 'INSTALL_APP', category: 'AR_APP' },
+            message: `Installing ${app.name}... This will enable: ${app.description.toLowerCase()}`,
+            data: { appId: app.id, appName: app.name, install: true },
+            requiresConfirmation: false,
+            suggestedActions: [],
+            confidence: 1.0
+          };
+        }
+        
+      case 'close':
+        if (!app.running) {
+          return {
+            intent: { type: 'APP_INFO', category: 'AR_APP' },
+            message: `${app.name} is not currently running.`,
+            data: { appId: app.id, appName: app.name },
+            requiresConfirmation: false,
+            suggestedActions: [`Launch ${app.name}`],
+            confidence: 1.0
+          };
+        } else {
+          return {
+            intent: { type: 'CLOSE_APP', category: 'AR_APP' },
+            message: `Closing ${app.name}...`,
+            data: { appId: app.id, appName: app.name, close: true },
+            requiresConfirmation: false,
+            suggestedActions: [],
+            confidence: 1.0
+          };
+        }
+        
+      case 'uninstall':
+        if (!app.installed) {
+          return {
+            intent: { type: 'APP_INFO', category: 'AR_APP' },
+            message: `${app.name} is not installed.`,
+            data: { appId: app.id, appName: app.name },
+            requiresConfirmation: false,
+            suggestedActions: [`Install ${app.name}`],
+            confidence: 1.0
+          };
+        } else {
+          return {
+            intent: { type: 'UNINSTALL_APP', category: 'AR_APP' },
+            message: `Are you sure you want to uninstall ${app.name}?`,
+            data: { appId: app.id, appName: app.name, uninstall: true },
+            requiresConfirmation: true,
+            suggestedActions: ['Yes, uninstall', 'No, keep it'],
+            confidence: 1.0
+          };
+        }
+    }
+    
+    return {
+      intent: { type: 'SPEAK', category: 'SYSTEM' },
+      message: `I understand you want to ${action} ${app.name}, but something went wrong.`,
+      requiresConfirmation: false,
+      suggestedActions: [],
+      confidence: 0.5
+    };
+  }
+
+  /**
+   * Detect system capability intents
+   */
+  private detectCapabilityIntent(input: string): { capability: string; action: string } | null {
+    const text = input.toLowerCase();
+    
+    // Vision/Analysis
+    if (/\b(analyze|scan|look|see|identify|recognize|what is this|what's this)\b/.test(text)) {
+      return { capability: 'vision', action: 'analyze' };
+    }
+    
+    // Wallet
+    if (/\b(wallet|balance|send|transfer|pay|money|funds|kara)\b/.test(text)) {
+      return { capability: 'wallet', action: 'show' };
+    }
+    
+    // AR Workspace
+    if (/\b(workspace|create object|place|ar|3d)\b/.test(text)) {
+      return { capability: 'ar_workspace', action: 'open' };
+    }
+    
+    // Settings
+    if (/\b(settings|preferences|configure|setup)\b/.test(text)) {
+      return { capability: 'settings', action: 'open' };
+    }
+    
+    return null;
+  }
+
+  /**
+   * Handle system capability intents
+   */
+  private handleCapabilityIntent(intent: { capability: string; action: string }, input: string): OracleResponse {
+    systemContext.addActivity(`Capability intent: ${intent.capability} - ${intent.action}`);
+    
+    switch (intent.capability) {
+      case 'vision':
+        return {
+          intent: { type: 'ANALYZE', category: 'VISION' },
+          message: 'Activating vision analysis...',
+          data: { capability: 'vision' },
+          requiresConfirmation: false,
+          suggestedActions: [],
+          confidence: 0.9
+        };
+        
+      case 'wallet':
+        return {
+          intent: { type: 'WALLET', category: 'BLOCKCHAIN' },
+          message: 'Opening your sovereign wallet...',
+          data: { capability: 'wallet' },
+          requiresConfirmation: false,
+          suggestedActions: ['Check balance', 'Send KARA', 'View transactions'],
+          confidence: 0.9
+        };
+        
+      case 'ar_workspace':
+        return {
+          intent: { type: 'OPEN_APP', category: 'AR_APP' },
+          message: 'Opening AR Workspace...',
+          data: { capability: 'ar_workspace', mode: 'AR_WORKSPACE' },
+          requiresConfirmation: false,
+          suggestedActions: [],
+          confidence: 0.9
+        };
+        
+      case 'settings':
+        return {
+          intent: { type: 'SYSTEM', category: 'SYSTEM' },
+          message: 'Opening system settings...',
+          data: { capability: 'settings', showSettings: true },
+          requiresConfirmation: false,
+          suggestedActions: [],
+          confidence: 0.9
+        };
+    }
+    
+    return {
+      intent: { type: 'SPEAK', category: 'SYSTEM' },
+      message: 'I can help with that!',
+      requiresConfirmation: false,
+      suggestedActions: [],
+      confidence: 0.5
+    };
+  }
+
+  /**
+   * Fallback local processing with full system context
+   */
+  private async processLocallyWithContext(input: string, context?: OracleContext, systemInfo?: string): Promise<OracleResponse> {
+    // Try Gemini with system context if available
+    if (this.gemini && systemInfo) {
+      return await this.enhanceWithGemini(input, {
+        intent: { type: 'SPEAK', category: 'KNOWLEDGE' },
+        message: 'Let me help you with that...',
+        requiresConfirmation: false,
+        suggestedActions: [],
+        confidence: 0.5
+      }, context, systemInfo);
+    }
+    
+    // Ultimate fallback
+    return {
+      intent: { type: 'SPEAK', category: 'SYSTEM' },
+      message: 'Backend is currently offline. Some features may be unavailable.',
+      requiresConfirmation: false,
+      suggestedActions: ['Check connection', 'Try again'],
+      confidence: 0.3
+    };
+  }
+
   /**
    * Check if this is a knowledge/question query vs an OS command
    */
@@ -141,7 +443,7 @@ class OracleAI {
       /what('s| is) my balance/,
       /how much (kara|money|funds)/,
       /what('s| is) (this|that)/, // vision
-      /how (do i|to) (send|transfer|pay)/,
+      /how (do i|to) (send|transfer|pay|open|install)/,
     ];
     
     // Check if it matches OS patterns first
@@ -237,31 +539,37 @@ class OracleAI {
   private async enhanceWithGemini(
     input: string, 
     backendResponse: OracleResponse,
-    context?: OracleContext
+    context?: OracleContext,
+    systemInfo?: string
   ): Promise<OracleResponse> {
     if (!this.gemini) {
       return backendResponse;
     }
     
     try {
-      const systemPrompt = `You are the Kāraṇa OS Oracle - an AI assistant for a blockchain-powered smart glasses operating system.
+      const systemPrompt = `You are the Kāraṇa OS Oracle - the BRAIN of a revolutionary AR glasses operating system.
 
-You're helpful, concise, and knowledgeable. Keep responses under 150 words unless detailed explanations are needed.
+You have COMPLETE awareness of the system:
 
-Current context:
+${systemInfo || 'System information unavailable'}
+
+Current Context:
 - User's KARA balance: ${context?.walletBalance || 'unknown'}
 - Looking at: ${context?.visionObject || 'nothing specific'}
 - Current app: ${context?.currentApp || 'none'}
 
-Capabilities you can mention:
+Your Capabilities:
+- Install & launch ANY Android app (YouTube, WhatsApp, Instagram, TikTok, Spotify, etc.)
 - Send/receive KARA tokens via voice
-- Open AR apps (browser, video, notes, music, terminal)
-- Analyze what user is looking at
+- Analyze what user is looking at in real-time
 - Set reminders and timers
 - Navigate to places
-- Vote on DAO proposals
+- Open AR workspace for 3D creation
+- Control system settings
+- Answer questions about anything
 
-Answer naturally and helpfully.`;
+Be proactive! If user asks to open an app that's not installed, offer to install it automatically.
+Keep responses natural, concise (under 150 words), and actionable.`;
 
       const response = await this.gemini.models.generateContent({
         model: GEMINI_MODEL,

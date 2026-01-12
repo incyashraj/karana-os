@@ -1,116 +1,121 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AnalysisResult, OracleIntent } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Mock "Local" AI Service
+const MODEL_NAME = "KARANA-NATIVE-V1";
 
-const MODEL_NAME = "gemini-2.5-flash";
-
-// 1. Vision Intelligence (BLIP Equivalent)
-export const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
-  try {
-    const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          {
-            text: "You are the Vision Layer of Kāraṇa OS. Analyze this image. Identify the main object. Return JSON: 'detectedObject' (short name), 'category', 'description' (1 short sentence), 'confidence' (0-100), 'relatedTags' (3 tags).",
-          },
-        ],
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            detectedObject: { type: Type.STRING },
-            category: { type: Type.STRING },
-            description: { type: Type.STRING },
-            confidence: { type: Type.NUMBER },
-            relatedTags: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-        },
-      },
-    });
-
-    if (response.text) {
-      return JSON.parse(response.text) as AnalysisResult;
-    }
-    throw new Error("No response text");
-  } catch (error) {
-    console.error("Analysis failed", error);
-    throw error;
+// Simulated Knowledge Base for Vision
+const MOCK_VISION_RESULTS: AnalysisResult[] = [
+  {
+    detectedObject: "Quantum Processor",
+    category: "Hardware",
+    description: "Advanced computing unit with holographic interface capabilities.",
+    confidence: 98,
+    relatedTags: ["tech", "compute", "future"]
+  },
+  {
+    detectedObject: "Bio-Luminescent Plant",
+    category: "Flora",
+    description: "Genetically modified organism emitting natural light.",
+    confidence: 92,
+    relatedTags: ["nature", "biotech", "organic"]
+  },
+  {
+    detectedObject: "Smart Coffee Cup",
+    category: "Everyday Item",
+    description: "Ceramic vessel with embedded temperature control sensors.",
+    confidence: 89,
+    relatedTags: ["iot", "beverage", "smart-home"]
+  },
+  {
+    detectedObject: "Unknown Artifact",
+    category: "Mystery",
+    description: "Unidentified object with unusual energy signature.",
+    confidence: 45,
+    relatedTags: ["anomaly", "scan-required", "caution"]
   }
+];
+
+// 1. Vision Intelligence (Mocked Local Model)
+export const analyzeImage = async (base64Image: string): Promise<AnalysisResult> => {
+  console.log(`[${MODEL_NAME}] Processing visual data locally...`);
+  
+  // Simulate processing delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  // Return a random result from our "knowledge base"
+  const result = MOCK_VISION_RESULTS[Math.floor(Math.random() * MOCK_VISION_RESULTS.length)];
+  
+  return result;
 };
 
-// 2. Oracle Layer (Intent Processing)
+// 2. Oracle Layer (Mocked Intent Processing)
 export const processOracleIntent = async (userText: string, context?: string): Promise<OracleIntent> => {
-  try {
-    const systemPrompt = `
-      You are the Oracle Layer of Kāraṇa OS, a sovereign operating system for smart glasses.
-      Your job is to translate natural language into specific System Intents.
-      
-      Available Intents:
-      - TRANSFER: sending tokens/money. (Extract amount and recipient)
-      - ANALYZE: user asks "what is this?", "scan", "identify", "what am I looking at".
-      - NAVIGATE: user wants directions. (Extract location)
-      - TIMER: user wants to set a timer. (Extract duration)
-      - WALLET: user wants to check balance, view transactions, or open wallet.
-      - SPEAK: General conversation or questions about the OS/Blockchain/Identity.
+  console.log(`[${MODEL_NAME}] Processing intent: "${userText}" Context: ${context}`);
+  
+  // Simulate processing delay
+  await new Promise(resolve => setTimeout(resolve, 800));
 
-      Context: ${context || "User is in idle mode."}
-      
-      Output JSON matching the schema.
-    `;
+  const lowerText = userText.toLowerCase();
 
-    const schema: Schema = {
-      type: Type.OBJECT,
-      properties: {
-        type: { 
-          type: Type.STRING, 
-          enum: ["SPEAK", "TRANSFER", "ANALYZE", "NAVIGATE", "TIMER", "WALLET"] 
-        },
-        content: { type: Type.STRING, description: "A short, HUD-friendly response text." },
-        data: {
-          type: Type.OBJECT,
-          properties: {
-            amount: { type: Type.NUMBER },
-            recipient: { type: Type.STRING },
-            location: { type: Type.STRING },
-            duration: { type: Type.STRING },
-          }
-        }
-      },
-      required: ["type", "content"]
+  // Simple Keyword-based Intent Classification (Simulating NLU)
+  
+  // TRANSFER
+  if (lowerText.includes("transfer") || lowerText.includes("send") || lowerText.includes("pay")) {
+    const amountMatch = userText.match(/\d+/);
+    const amount = amountMatch ? parseInt(amountMatch[0]) : 0;
+    // Simple heuristic for recipient (word after "to")
+    const recipientMatch = lowerText.match(/to\s+(\w+)/);
+    const recipient = recipientMatch ? recipientMatch[1] : "Unknown";
+
+    return {
+      type: "TRANSFER",
+      content: `Initiating secure transfer of ${amount} KARA to ${recipient}. Please confirm identity.`,
+      data: { amount, recipient }
     };
-
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: { parts: [{ text: userText }] },
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: schema
-      }
-    });
-
-    if (response.text) {
-      return JSON.parse(response.text) as OracleIntent;
-    }
-    return { type: 'SPEAK', content: "I didn't catch that." };
-
-  } catch (error) {
-    console.error("Oracle processing failed", error);
-    return { type: 'SPEAK', content: "Oracle Layer offline." };
   }
+
+  // ANALYZE
+  if (lowerText.includes("scan") || lowerText.includes("what is") || lowerText.includes("identify") || lowerText.includes("look at")) {
+    return {
+      type: "ANALYZE",
+      content: "Activating visual cortex. Scanning environment...",
+      data: {}
+    };
+  }
+
+  // NAVIGATE
+  if (lowerText.includes("navigate") || lowerText.includes("go to") || lowerText.includes("directions")) {
+    const location = userText.replace(/navigate to|go to|directions to/i, "").trim();
+    return {
+      type: "NAVIGATE",
+      content: `Calculating optimal path to ${location}. HUD navigation initialized.`,
+      data: { location }
+    };
+  }
+
+  // WALLET
+  if (lowerText.includes("wallet") || lowerText.includes("balance") || lowerText.includes("money")) {
+    return {
+      type: "WALLET",
+      content: "Accessing sovereign identity vault. Displaying assets.",
+      data: {}
+    };
+  }
+
+  // TIMER
+  if (lowerText.includes("timer") || lowerText.includes("alarm")) {
+    const duration = userText.replace(/set a timer for|timer/i, "").trim();
+    return {
+      type: "TIMER",
+      content: `Timer set for ${duration}. I will notify you when it concludes.`,
+      data: { duration }
+    };
+  }
+
+  // DEFAULT / CONVERSATIONAL
+  return {
+    type: "SPEAK",
+    content: `I am the Kāraṇa Local Oracle (v1.0). I processed your request: "${userText}" locally on-device. How can I assist you further?`,
+    data: {}
+  };
 };

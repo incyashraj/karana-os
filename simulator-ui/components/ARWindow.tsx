@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Minus, Maximize2, Minimize2, Move, RotateCw, Volume2, VolumeX, Play, Pause, SkipBack, SkipForward, Globe, FileText, Terminal, Image, Music, Video, Calendar, Mail, Settings, Grip } from 'lucide-react';
+import AppStore from './AppStore';
 
 export interface ARWindowProps {
   id: string;
   title: string;
-  type: 'video' | 'browser' | 'terminal' | 'notes' | 'image' | 'music' | 'calendar' | 'mail' | 'custom';
+  type: 'video' | 'browser' | 'terminal' | 'notes' | 'image' | 'music' | 'calendar' | 'mail' | 'appstore' | 'custom';
   initialPosition: { x: number; y: number };
   initialSize: { width: number; height: number };
   initialDepth?: number; // Z-depth for 3D effect
@@ -290,9 +291,9 @@ const ARWindow: React.FC<ARWindowProps> = ({
           )}
 
           {type === 'browser' && (
-            <div className="w-full h-full flex flex-col bg-gray-900">
+            <div className="w-full h-full flex flex-col bg-black/40">
               {/* URL Bar */}
-              <div className="flex items-center gap-2 p-2 bg-black/40 border-b border-white/10">
+              <div className="flex items-center gap-2 p-2 bg-white/5 border-b border-white/10">
                 <div className="flex gap-1">
                   <button className="p-1 hover:bg-white/10 rounded text-gray-400">←</button>
                   <button className="p-1 hover:bg-white/10 rounded text-gray-400">→</button>
@@ -336,7 +337,7 @@ const ARWindow: React.FC<ARWindowProps> = ({
           )}
 
           {type === 'terminal' && (
-            <div className="w-full h-full bg-black font-mono text-sm p-4 overflow-auto">
+            <div className="w-full h-full bg-black/80 font-mono text-sm p-4 overflow-auto backdrop-blur-md">
               <div className="text-green-400">
                 <p className="text-green-600">Last login: {new Date().toLocaleString()}</p>
                 <p className="mt-2">
@@ -409,6 +410,47 @@ const ARWindow: React.FC<ARWindowProps> = ({
                 <button className="p-2 hover:bg-white/10 rounded-full"><SkipForward size={20} /></button>
               </div>
             </div>
+          )}
+
+          {type === 'appstore' && (
+            <AppStore
+              onLaunchApp={(packageName, appInfo) => {
+                // Show native app launch notification
+                console.log(`🚀 Native App Launch Request:`);
+                console.log(`   App: ${appInfo.appName}`);
+                console.log(`   Package: ${packageName}`);
+                console.log(`   APK: ${appInfo.apkPath}`);
+                
+                // In a real AR OS, this would launch the native Android activity
+                // For now, we'll show a visual notification
+                const notification = document.createElement('div');
+                notification.style.cssText = `
+                  position: fixed;
+                  top: 20px;
+                  right: 20px;
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  color: white;
+                  padding: 16px 24px;
+                  border-radius: 12px;
+                  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                  z-index: 10000;
+                  animation: slideIn 0.3s ease-out;
+                  font-family: system-ui;
+                `;
+                notification.innerHTML = `
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">🚀</span>
+                    <div>
+                      <div style="font-weight: bold; margin-bottom: 4px;">Launching ${appInfo.appName}</div>
+                      <div style="font-size: 11px; opacity: 0.9;">Native Android Activity</div>
+                    </div>
+                  </div>
+                `;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 3000);
+              }}
+              onClose={onClose}
+            />
           )}
 
           {type === 'calendar' && (

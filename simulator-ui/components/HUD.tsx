@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Battery, Wifi, Activity, Clock, Navigation, ShieldCheck, Wallet } from 'lucide-react';
+import { Battery, Wifi, Activity, Clock, Navigation, ShieldCheck, Wallet, BarChart3 } from 'lucide-react';
 import { AppMode, WalletState } from '../types';
 
 interface HUDProps {
   mode: AppMode;
   wallet: WalletState;
+  ephemeralMode?: boolean;
   children: React.ReactNode;
+  onShowDashboard?: () => void;
 }
 
-export const HUD: React.FC<HUDProps> = ({ mode, wallet, children }) => {
+export const HUD: React.FC<HUDProps> = ({ mode, wallet, ephemeralMode, children, onShowDashboard }) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -30,44 +32,57 @@ export const HUD: React.FC<HUDProps> = ({ mode, wallet, children }) => {
   const themeHex = mode === AppMode.ANALYZING ? '#fbbf24' : mode === AppMode.ORACLE ? '#c084fc' : mode === AppMode.NAVIGATION ? '#34d399' : mode === AppMode.WALLET ? '#60a5fa' : '#22d3ee';
 
   return (
-    <div className="relative w-full h-full flex flex-col justify-between p-4 sm:p-6 pointer-events-none select-none font-rajdhani">
+    <div className="relative w-full h-full flex flex-col justify-between p-6 pointer-events-none select-none font-sans">
       {/* Top Bar */}
       <div className="flex justify-between items-start">
-        {/* Left: OS Info & Wallet */}
-        <div className="flex flex-col gap-2 items-start">
-          <div className={`glass-panel px-4 py-2 rounded-br-xl flex items-center gap-3 ${themeColor} border-t-0 border-l-0`}>
-             <ShieldCheck size={16} />
-             <div className="flex flex-col leading-none">
-                <span className="text-[10px] opacity-70 tracking-widest">KĀRAṆA OS</span>
-                <span className="text-lg font-bold tracking-wider">{mode}</span>
-             </div>
+        {/* Left: OS Info */}
+        <div className="flex gap-3">
+          <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-3">
+             <ShieldCheck size={16} className={mode === AppMode.ANALYZING ? 'text-amber-400' : 'text-cyan-400'} />
+             <span className="text-xs font-bold tracking-wider opacity-80">KĀRAṆA OS</span>
+             <div className="w-px h-3 bg-white/20"></div>
+             <span className="text-xs font-medium text-white/60">{mode}</span>
           </div>
           
-          {/* Simulated Identity Badge */}
-          <div className="glass-panel px-3 py-1 rounded-r-lg border-l-0 flex items-center gap-2 opacity-80">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-            <span className="hud-font text-xs text-gray-300">{wallet.did.substring(0, 16)}...</span>
+          {/* Identity Pill */}
+          <div className="glass-panel px-3 py-2 rounded-full flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${ephemeralMode ? 'bg-purple-500' : 'bg-green-500'} animate-pulse`}></div>
+            <span className="font-mono text-[10px] text-white/60">
+              {ephemeralMode ? 'EPHEMERAL' : wallet.did === 'Not Connected' ? 'GUEST' : wallet.did.substring(0, 8) + '...'}
+            </span>
           </div>
         </div>
 
-        {/* Right: Balance & Status */}
-        <div className="flex flex-col gap-2 items-end">
-          <div className={`glass-panel px-6 py-2 rounded-bl-xl flex items-center gap-6 ${themeColor} border-t-0 border-r-0`}>
-            <div className="flex items-center gap-2">
-              <Clock size={16} />
-              <span className="hud-font text-lg">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        {/* Right: Status */}
+        <div className="flex gap-3 items-start">
+          {/* Wallet Balance (if connected) */}
+          {wallet.did !== 'Not Connected' && (
+            <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-2">
+              <Wallet size={14} className="text-blue-400" />
+              <span className="font-mono text-xs">{wallet.balance.toFixed(4)} KAR</span>
             </div>
-            <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-              <Wifi size={16} />
-              <Battery size={16} />
-            </div>
-          </div>
+          )}
 
-          {/* Wallet Balance Widget */}
-          <div className="glass-panel px-4 py-1 rounded-l-lg border-r-0 flex items-center gap-3 text-cyan-300">
-             <Wallet size={14} />
-             <span className="hud-font text-base font-bold">{wallet.balance.toLocaleString()} KARA</span>
+          {/* Time & System */}
+          <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-4">
+            <span className="font-mono text-sm font-medium">{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            <div className="w-px h-3 bg-white/20"></div>
+            <div className="flex gap-2 text-white/60">
+              <Wifi size={14} />
+              <Battery size={14} />
+            </div>
           </div>
+          
+          {/* Intelligence Dashboard Button */}
+          {onShowDashboard && (
+            <button
+              onClick={onShowDashboard}
+              className="glass-panel px-3 py-2 rounded-full flex items-center gap-2 text-purple-400 hover:bg-purple-500/20 transition-all pointer-events-auto cursor-pointer"
+              title="Intelligence Dashboard"
+            >
+              <BarChart3 size={14} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -77,19 +92,19 @@ export const HUD: React.FC<HUDProps> = ({ mode, wallet, children }) => {
       </div>
 
       {/* Decorative Corners & HUD Lines */}
-      <svg className="absolute top-0 left-0 w-full h-full -z-10 opacity-60 pointer-events-none">
+      <svg className="absolute top-0 left-0 w-full h-full -z-10 opacity-60 pointer-events-none" viewBox="0 0 1920 1080" preserveAspectRatio="none">
          <path d="M 30 150 V 30 H 150" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
-         <path d="M calc(100% - 30px) 150 V 30 H calc(100% - 150px)" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
-         <path d="M 30 calc(100% - 150px) V calc(100% - 30px) H 150" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
-         <path d="M calc(100% - 30px) calc(100% - 150px) V calc(100% - 30px) H calc(100% - 150px)" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
+         <path d="M 1890 150 V 30 H 1770" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
+         <path d="M 30 930 V 1050 H 150" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
+         <path d="M 1890 930 V 1050 H 1770" fill="none" stroke={themeHex} strokeWidth="2" strokeDasharray="10 5" opacity="0.5" />
          
          {/* Center Reticle */}
          {(mode === AppMode.IDLE || mode === AppMode.ANALYZING) && (
             <g opacity="0.4">
-              <circle cx="50%" cy="50%" r="150" stroke={themeHex} strokeWidth="1" fill="none" strokeDasharray="4 4" />
-              <circle cx="50%" cy="50%" r="5" fill={themeHex} />
-              <path d="M calc(50% - 20px) 50% H calc(50% - 100px)" stroke={themeHex} strokeWidth="1" />
-              <path d="M calc(50% + 20px) 50% H calc(50% + 100px)" stroke={themeHex} strokeWidth="1" />
+              <circle cx="960" cy="540" r="150" stroke={themeHex} strokeWidth="1" fill="none" strokeDasharray="4 4" />
+              <circle cx="960" cy="540" r="5" fill={themeHex} />
+              <path d="M 940 540 H 860" stroke={themeHex} strokeWidth="1" />
+              <path d="M 980 540 H 1060" stroke={themeHex} strokeWidth="1" />
             </g>
          )}
       </svg>

@@ -3,13 +3,15 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 interface CameraFeedProps {
   active: boolean;
   onFrameCapture?: (dataUrl: string) => void;
+  onVideoReady?: (video: HTMLVideoElement) => void;
 }
 
 export interface CameraFeedHandle {
   captureFrame: () => string | null;
+  video: HTMLVideoElement | null;
 }
 
-const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(({ active }, ref) => {
+const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(({ active, onVideoReady }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -28,7 +30,8 @@ const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(({ active }, re
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
       return canvas.toDataURL('image/jpeg', 0.8);
-    }
+    },
+    video: videoRef.current
   }));
 
   useEffect(() => {
@@ -43,6 +46,13 @@ const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(({ active }, re
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            console.log("CameraFeed: Video metadata loaded, attempting to play");
+            videoRef.current?.play().then(() => console.log("CameraFeed: Video playing")).catch(e => console.error("CameraFeed: Play failed", e));
+            if (onVideoReady && videoRef.current) {
+              onVideoReady(videoRef.current);
+            }
+          };
         }
       } catch (err) {
         console.warn("Camera access denied or unavailable, using fallback.");
@@ -61,7 +71,7 @@ const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(({ active }, re
   }, [active]);
 
   return (
-    <div className="absolute inset-0 w-full h-full bg-black -z-10 overflow-hidden">
+    <div className="absolute inset-0 w-full h-full bg-black z-0 overflow-hidden">
       {/* Real Camera Feed */}
       <video 
         ref={videoRef}

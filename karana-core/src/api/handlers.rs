@@ -92,7 +92,8 @@ pub async fn get_wallet_info(
             (StatusCode::OK, Json(ApiResponse::success(info)))
         }
         None => {
-            (StatusCode::NOT_FOUND, Json(ApiResponse::<WalletInfo>::error("No wallet found. Create or restore one first.")))
+            // Return 200 with error message - no wallet is an expected state
+            (StatusCode::OK, Json(ApiResponse::<WalletInfo>::error("No wallet found. Create or restore one first.")))
         }
     }
 }
@@ -338,6 +339,37 @@ pub async fn process_oracle(
     // Process through Oracle
     let oracle_response = oracle.process(&req.text, context);
     
+    // NEW: Execute actual tools based on Oracle intent
+    use crate::oracle::tool_bridge;
+    use crate::assistant::ToolRegistry;
+    
+    // Create tool registry with default tools
+    let tool_registry = state.tool_registry.as_ref()
+        .or_else(|| {
+            // Fallback: create temporary registry if not in state
+            log::warn!("[API] No tool registry in state - tools won't execute");
+            None
+        });
+    
+    // Execute the intent if we have tools
+    let execution_result = if let Some(registry) = tool_registry {
+        match tool_bridge::execute_intent(&oracle_response.intent, registry).await {
+            Ok(result) => {
+                log::info!("[API] ✓ Tool executed: {}", result);
+                Some(result)
+            }
+            Err(e) => {
+                log::warn!("[API] Tool execution failed: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+    
+    // Use execution result if available, otherwise use Oracle's message
+    let final_message = execution_result.unwrap_or_else(|| oracle_response.message.clone());
+    
     // Broadcast: Oracle is executing
     state.broadcast_oracle_thinking(&req.text, "executing").await;
     
@@ -494,12 +526,12 @@ pub async fn process_oracle(
         suggested.insert(0, format!("action_id:{}", action_id));
     }
     
-    // Clone message before moving into response
-    let message = oracle_response.message.clone();
+    // Clone final message (tool result or oracle message) before moving into response
+    let message = final_message.clone();
     
     let response = OracleIntentResponse {
         intent_type: intent_type.clone(),
-        content: oracle_response.message,
+        content: final_message,
         data,
         requires_confirmation: needs_confirmation,
         suggested_actions: suggested,
