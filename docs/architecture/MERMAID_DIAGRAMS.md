@@ -354,10 +354,22 @@ Detailed breakdown of major subsystems and their interfaces.
 graph TB
     subgraph AISubsystem["AI/ML Subsystem"]
         direction TB
-        NLUComp[NLU Component<br/>───────────<br/>+ classify_intent()<br/>+ extract_entities()<br/>+ compute_confidence()]
-        DialogueComp[Dialogue Component<br/>───────────<br/>+ track_context()<br/>+ resolve_references()<br/>+ manage_session()]
-        ReasoningComp[Reasoning Component<br/>───────────<br/>+ chain_of_thought()<br/>+ plan_actions()<br/>+ visual_reasoning()]
-        VisionComp[Vision Component<br/>───────────<br/>+ detect_objects()<br/>+ segment_scene()<br/>+ track_objects()]
+        NLUComp["NLU Component
+        classify_intent
+        extract_entities
+        compute_confidence"]
+        DialogueComp["Dialogue Component
+        track_context
+        resolve_references
+        manage_session"]
+        ReasoningComp["Reasoning Component
+        chain_of_thought
+        plan_actions
+        visual_reasoning"]
+        VisionComp["Vision Component
+        detect_objects
+        segment_scene
+        track_objects"]
         
         NLUComp --> DialogueComp
         DialogueComp --> ReasoningComp
@@ -366,10 +378,22 @@ graph TB
 
     subgraph BlockchainSubsystem["Blockchain Subsystem"]
         direction TB
-        ConsensusComp[Consensus Component<br/>───────────<br/>+ propose_block()<br/>+ validate_block()<br/>+ finalize_block()]
-        TxComp[Transaction Component<br/>───────────<br/>+ create_tx()<br/>+ validate_tx()<br/>+ execute_tx()]
-        StateComp[State Component<br/>───────────<br/>+ read_state()<br/>+ write_state()<br/>+ compute_root()]
-        WalletComp[Wallet Component<br/>───────────<br/>+ sign_tx()<br/>+ verify_signature()<br/>+ manage_keys()]
+        ConsensusComp["Consensus Component
+        propose_block
+        validate_block
+        finalize_block"]
+        TxComp["Transaction Component
+        create_tx
+        validate_tx
+        execute_tx"]
+        StateComp["State Component
+        read_state
+        write_state
+        compute_root"]
+        WalletComp["Wallet Component
+        sign_tx
+        verify_signature
+        manage_keys"]
         
         TxComp --> ConsensusComp
         ConsensusComp --> StateComp
@@ -378,10 +402,22 @@ graph TB
 
     subgraph NetworkSubsystem["P2P Network Subsystem"]
         direction TB
-        P2PComp[P2P Component<br/>───────────<br/>+ connect_peer()<br/>+ disconnect_peer()<br/>+ send_message()]
-        DiscoveryComp[Discovery Component<br/>───────────<br/>+ discover_peers()<br/>+ announce_self()<br/>+ query_dht()]
-        GossipComp[Gossip Component<br/>───────────<br/>+ publish()<br/>+ subscribe()<br/>+ validate_msg()]
-        SyncComp[Sync Component<br/>───────────<br/>+ sync_blocks()<br/>+ request_block()<br/>+ verify_chain()]
+        P2PComp["P2P Component
+        connect_peer
+        disconnect_peer
+        send_message"]
+        DiscoveryComp["Discovery Component
+        discover_peers
+        announce_self
+        query_dht"]
+        GossipComp["Gossip Component
+        publish
+        subscribe
+        validate_msg"]
+        SyncComp["Sync Component
+        sync_blocks
+        request_block
+        verify_chain"]
         
         DiscoveryComp --> P2PComp
         P2PComp --> GossipComp
@@ -390,10 +426,22 @@ graph TB
 
     subgraph OracleSubsystem["Oracle Bridge Subsystem"]
         direction TB
-        IntentComp[Intent Component<br/>───────────<br/>+ parse_intent()<br/>+ validate_params()<br/>+ map_to_tool()]
-        ZKComp[ZK Proof Component<br/>───────────<br/>+ generate_proof()<br/>+ verify_proof()<br/>+ setup_circuit()]
-        ToolComp[Tool Component<br/>───────────<br/>+ register_tool()<br/>+ execute_tool()<br/>+ get_definition()]
-        OracleComp[Oracle Manager<br/>───────────<br/>+ queue_request()<br/>+ settle_request()<br/>+ timeout_handler()]
+        IntentComp["Intent Component
+        parse_intent
+        validate_params
+        map_to_tool"]
+        ZKComp["ZK Proof Component
+        generate_proof
+        verify_proof
+        setup_circuit"]
+        ToolComp["Tool Component
+        register_tool
+        execute_tool
+        get_definition"]
+        OracleComp["Oracle Manager
+        queue_request
+        settle_request
+        timeout_handler"]
         
         IntentComp --> ToolComp
         ToolComp --> ZKComp
@@ -402,10 +450,22 @@ graph TB
 
     subgraph HardwareSubsystem["Hardware Abstraction Subsystem"]
         direction TB
-        CameraComp[Camera Component<br/>───────────<br/>+ capture_frame()<br/>+ set_exposure()<br/>+ set_white_balance()]
-        SensorComp[Sensor Component<br/>───────────<br/>+ read_imu()<br/>+ read_gps()<br/>+ read_magnetometer()]
-        AudioComp[Audio Component<br/>───────────<br/>+ capture_audio()<br/>+ play_audio()<br/>+ spatial_audio()]
-        DisplayComp[Display Component<br/>───────────<br/>+ render_frame()<br/>+ set_brightness()<br/>+ get_resolution()]
+        CameraComp["Camera Component
+        capture_frame
+        set_exposure
+        set_white_balance"]
+        SensorComp["Sensor Component
+        read_imu
+        read_gps
+        read_magnetometer"]
+        AudioComp["Audio Component
+        capture_audio
+        play_audio
+        spatial_audio"]
+        DisplayComp["Display Component
+        render_frame
+        set_brightness
+        get_resolution"]
         
         CameraComp -.->|Frame Data| VisionComp
         SensorComp -.->|IMU Data| VisionComp
@@ -414,10 +474,22 @@ graph TB
 
     subgraph CoreInfrastructure["Core Infrastructure"]
         direction TB
-        EventBusComp[Event Bus<br/>───────────<br/>+ publish()<br/>+ subscribe()<br/>+ unsubscribe()]
-        OrchestratorComp[Orchestrator<br/>───────────<br/>+ schedule()<br/>+ execute()<br/>+ cancel()]
-        ResourceComp[Resource Manager<br/>───────────<br/>+ allocate()<br/>+ deallocate()<br/>+ monitor()]
-        ResilienceComp[Resilience Manager<br/>───────────<br/>+ health_check()<br/>+ circuit_break()<br/>+ recover()]
+        EventBusComp["Event Bus
+        publish
+        subscribe
+        unsubscribe"]
+        OrchestratorComp["Orchestrator
+        schedule
+        execute
+        cancel"]
+        ResourceComp["Resource Manager
+        allocate
+        deallocate
+        monitor"]
+        ResilienceComp["Resilience Manager
+        health_check
+        circuit_break
+        recover"]
     end
 
     %% Cross-component connections
@@ -688,8 +760,10 @@ graph TB
 
     subgraph AsyncOrchSys["Async Orchestrator"]
         AO[Orchestrator Core]
-        AO_Sched[Priority Scheduler<br/>BinaryHeap]
-        AO_Exec[Task Executor<br/>tokio::spawn]
+        AO_Sched["Priority Scheduler
+        BinaryHeap"]
+        AO_Exec["Task Executor
+        tokio::spawn"]
         AO_Timeout[Deadline Enforcer]
         
         AO_Sched --> AO
@@ -700,7 +774,8 @@ graph TB
     subgraph CapRegSys["Capability Registry"]
         CR[Registry Core]
         CR_Disc[Service Discovery]
-        CR_Map[Capability Map<br/>40+ capabilities]
+        CR_Map["Capability Map
+        40+ capabilities"]
         CR_Swap[Dynamic Swapping]
         
         CR_Disc --> CR
@@ -710,8 +785,10 @@ graph TB
 
     subgraph MonadSys["Monad Orchestrator"]
         MO[Monad Core]
-        MO_Tick[tick() Loop<br/>30s blocks]
-        MO_Coord[State Coordination<br/>Arc<Mutex<T>>]
+        MO_Tick["tick Loop
+        30s blocks"]
+        MO_Coord["State Coordination
+        Arc Mutex T"]
         MO_Seq[Sequential Updates]
         
         MO_Tick --> MO
@@ -721,10 +798,14 @@ graph TB
 
     subgraph ResourceSys["Resource Coordinator"]
         RC[Coordinator Core]
-        RC_Mon[Monitor<br/>CPU/GPU/RAM/Battery]
-        RC_Prof[AI Profiles<br/>5 levels]
-        RC_Mode[Ledger Modes<br/>Full/Light/Minimal]
-        RC_Pred[Predictive<br/>5min forecast]
+        RC_Mon["Monitor
+        CPU GPU RAM Battery"]
+        RC_Prof["AI Profiles
+        5 levels"]
+        RC_Mode["Ledger Modes
+        Full Light Minimal"]
+        RC_Pred["Predictive
+        5min forecast"]
         
         RC_Mon --> RC
         RC --> RC_Prof
@@ -735,8 +816,10 @@ graph TB
     subgraph ResilienceSys["Resilience Coordinator"]
         RS[Resilience Core]
         RS_Health[Health Monitor]
-        RS_CB[Circuit Breaker<br/>9 breakers]
-        RS_Min[Minimal Mode<br/><10MB fallback]
+        RS_CB["Circuit Breaker
+        9 breakers"]
+        RS_Min["Minimal Mode
+        10MB fallback"]
         RS_Rec[Auto-Recovery]
         
         RS_Health --> RS
